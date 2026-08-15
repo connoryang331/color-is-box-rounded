@@ -5,10 +5,14 @@ import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
 import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb, ringColorAt } from './color-math';
 
-/** Radius of the center color plate (also the inner ring's inner edge), in canvas px. */
+/** Radius of the center color plate, in canvas px. */
 export const RING_CENTER_R = 20;
-/** Band width of BOTH rings (they touch — no gap between them), in canvas px. */
-export const RING_W = 18;
+/** Gap between the center plate and the inner (saturation) ring, in canvas px. */
+export const RING_INNER_GAP = 4;
+/** Gap between the inner (saturation) ring and the outer (alpha) ring, in canvas px. */
+export const RING_MID_GAP = 8;
+/** Band width of BOTH rings, in canvas px. */
+export const RING_W = 16;
 
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
 export interface RingState {
@@ -522,10 +526,10 @@ export function renderRoundedBox(
   if (ring && ring.reveal > 0.01) {
     const anchorPt = ring.anchor;
     const ease = ring.reveal < 0.5 ? 2 * ring.reveal * ring.reveal : 1 - Math.pow(-2 * ring.reveal + 2, 2) / 2;
-    const cR = RING_CENTER_R * ease;                       // center color-plate radius
-    const rSat = (RING_CENTER_R + RING_W / 2) * ease;      // INNER ring = saturation band center
-    const rAlp = (RING_CENTER_R + RING_W * 1.5) * ease;    // OUTER ring = alpha band center
-    const wRing = RING_W * ease;                           // both bands share the same width
+    const cR = RING_CENTER_R * ease;                                     // center color-plate radius
+    const rSat = (RING_CENTER_R + RING_INNER_GAP + RING_W / 2) * ease;   // INNER ring = saturation band center
+    const rAlp = (RING_CENTER_R + RING_INNER_GAP + RING_W + RING_MID_GAP + RING_W / 2) * ease; // OUTER ring = alpha band center
+    const wRing = RING_W * ease;                                         // both bands share the same width
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
     const start = -Math.PI / 2; // 12 o'clock = 0%
@@ -569,43 +573,32 @@ export function renderRoundedBox(
       }
     };
 
-    // Widget label above 12 o'clock, bold with a dark outline so it reads over any face color
-    const ringLabel = (text: string, r: number, active: boolean) => {
-      const x = anchorPt.x;
-      const y = anchorPt.y - (r + wRing / 2) - 2;
-      overlayCtx.font = '700 12px ui-monospace, SF Mono, monospace';
-      overlayCtx.textAlign = 'center';
-      overlayCtx.textBaseline = 'alphabetic';
-      overlayCtx.lineWidth = 3;
-      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
-      overlayCtx.strokeText(text, x, y);
-      overlayCtx.fillStyle = active ? '#ffffff' : 'rgba(248, 250, 252, 0.95)';
-      overlayCtx.fillText(text, x, y);
-    };
-
-    // Thumb knob (shared by both rings): a ring of the given color with a white core, a small
-    // color dot and a subtle dark outline — marks the current value position on a ring.
-    const thumbKnob = (x: number, y: number, col: { r: number; g: number; b: number }) => {
+    // Thumb knob (shared by both rings) — matches the reference handles: a white outer ring
+    // with a solid white center dot, plus a thin dark outline so it reads on any background.
+    const thumbKnob = (x: number, y: number) => {
       overlayCtx.beginPath();
-      overlayCtx.arc(x, y, 9, 0, Math.PI * 2);
+      overlayCtx.arc(x, y, 8.5, 0, Math.PI * 2);
       overlayCtx.fillStyle = '#ffffff';
       overlayCtx.fill();
-      overlayCtx.lineWidth = 4.5;
-      overlayCtx.strokeStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
+      overlayCtx.lineWidth = 2;
+      overlayCtx.strokeStyle = '#ffffff';
       overlayCtx.stroke();
       overlayCtx.lineWidth = 1;
-      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
       overlayCtx.stroke();
       overlayCtx.beginPath();
       overlayCtx.arc(x, y, 3, 0, Math.PI * 2);
-      overlayCtx.fillStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
+      overlayCtx.fillStyle = '#ffffff';
       overlayCtx.fill();
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+      overlayCtx.lineWidth = 0.8;
+      overlayCtx.stroke();
     };
 
-    // INNER ring — SATURATION: a linear ramp like the classic saturation slider — black at
-    // 12 o'clock, the anchor color at 6 o'clock, white back at 12 o'clock (hue preserved),
-    // hugging the center color. Dragging around it sets the color to the ring color at the
-    // pointer angle; a marker dot shows the current position on the ring.
+    // INNER ring — SATURATION: a linear ramp like the classic saturation slider — white at
+    // 12 o'clock, the anchor color at 6 o'clock, black at 3 o'clock (hue preserved), hugging
+    // the center color. Dragging around it sets the color to the ring color at the pointer
+    // angle; a marker dot shows the current position on the ring.
     const anchorValues = ring.colorAnchor || dotValues;
     const anchorRgb = valuesToRgb(anchorValues, mode);
     const nSeg = 72;
@@ -620,11 +613,10 @@ export function renderRoundedBox(
       overlayCtx.strokeStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
       overlayCtx.stroke();
     }
-    // Thumb knob at the current saturation position (same style as the alpha ring's knob):
-    // a ring of the current color with a white core and a small color dot.
+    // Thumb knob at the current saturation position (same style as the alpha ring's knob).
     const mkx = anchorPt.x + rSat * Math.sin(ring.angle);
     const mky = anchorPt.y - rSat * Math.cos(ring.angle);
-    thumbKnob(mkx, mky, finalRgb);
+    thumbKnob(mkx, mky);
     bandEdges(rSat, wRing, ring.band === 'sat');
 
     // OUTER ring — ALPHA: dotted track (the transparent indicator) with the value arc drawn
@@ -643,10 +635,9 @@ export function renderRoundedBox(
       // alphaEnd is a canvas angle (0 = 3 o'clock, y down), so x uses cos and y uses +sin.
       const kx = anchorPt.x + rAlp * Math.cos(alphaEnd);
       const ky = anchorPt.y + rAlp * Math.sin(alphaEnd);
-      thumbKnob(kx, ky, finalRgb);
+      thumbKnob(kx, ky);
     }
     bandEdges(rAlp, wRing, ring.band === 'alpha');
-    ringLabel('SAT', rAlp, ring.band === 'sat');
 
     // Center circle — the current color at its alpha over the box (the enlarged pick
     // indicator): it updates live as the rings change, and shows translucency by letting the

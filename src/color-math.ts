@@ -212,8 +212,9 @@ export function rgbToValues(rgb: RGBColor, mode: ColorMode): Vec3 {
 /**
  * Color on the saturation ring at the given angle (radians, clockwise from 12 o'clock).
  * The ring is a single linear ramp like the classic saturation slider:
- *   top (0) = black · bottom (π) = the anchor color C · back to top (2π) = white.
- * So clockwise from 12 o'clock: black → C (brighten, 0..π) then C → white (desaturate, π..2π).
+ *   top (0) = white · right (π/2) = black · bottom (π) = the anchor color C · back to top (2π) = white.
+ * So clockwise from 12 o'clock: white → black (gray, 0..π/2), black → C (brighten, π/2..π),
+ * then C → white (desaturate, π..2π).
  * Linear RGB interpolation, so the hue is preserved (same as the triangle).
  */
 export function ringColorAt(anchor: RGBColor, angleRad: number): RGBColor {
@@ -222,15 +223,20 @@ export function ringColorAt(anchor: RGBColor, angleRad: number): RGBColor {
   const nr = anchor.r / 255;
   const ng = anchor.g / 255;
   const nb = anchor.b / 255;
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
   let r: number, g: number, b: number;
-  if (deg <= 180) {
-    // black → anchor color (brighten toward the color)
-    const t = deg / 180;
+  if (deg <= 90) {
+    // white (12 o'clock) → black (3 o'clock): pure gray ramp
+    const t = deg / 90;
+    r = 1 - t; g = 1 - t; b = 1 - t;
+  } else if (deg <= 180) {
+    // black (3 o'clock) → anchor color (6 o'clock): brighten toward the color
+    const t = (deg - 90) / 90;
     r = nr * t; g = ng * t; b = nb * t;
   } else {
-    // anchor color → white (desaturate toward white)
+    // anchor color (6 o'clock) → white (12 o'clock): desaturate toward white
     const t = (deg - 180) / 180;
-    r = t + (1 - t) * nr; g = t + (1 - t) * ng; b = t + (1 - t) * nb;
+    r = lerp(nr, 1, t); g = lerp(ng, 1, t); b = lerp(nb, 1, t);
   }
   const to255 = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 255);
   return { r: to255(r), g: to255(g), b: to255(b) };

@@ -5,7 +5,7 @@ import type {
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle } from './camera-math';
 import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, ringColorAt } from './color-math';
-import { initWebGL, renderRoundedBox, RING_CENTER_R, RING_W } from './rounded-renderer';
+import { initWebGL, renderRoundedBox, RING_CENTER_R, RING_INNER_GAP, RING_MID_GAP, RING_W } from './rounded-renderer';
 
 export interface RoundedBoxOptions {
   initialColor?: RGBColor;
@@ -135,7 +135,7 @@ export function createRoundedBoxPicker(
   let ringBandStartAngle = 0;
   let ringEngaged = false;
   // The saturation ring is a linear ramp like the classic saturation slider:
-  // black at 12 o'clock → the anchor color at 6 o'clock → white at 12 o'clock (hue preserved).
+  // white at 12 o'clock → the anchor color at 6 o'clock → black at 3 o'clock (hue preserved).
   let ringColorAnchor: Vec3 | null = null; // color captured at press (the ring's C vertex)
   let ringAngle = Math.PI;                 // current marker angle (starts at the anchor color, 6 o'clock)
   let ringReveal = 0;
@@ -483,13 +483,17 @@ export function createRoundedBoxPicker(
       // Bands scale with the reveal animation; pointer distance picks the active ring
       // (inner = saturation, outer = alpha), switchable mid-drag.
       const eReveal = easeInOutQuad(ringReveal);
-      // Contiguous bands (no gap): inner [rC, rC+rW], outer [rC+rW, rC+2rW]
+      // Gapped bands: center plate [0, rC], gap, sat [satIn, satOut], gap, alpha [alpIn, alpOut]
       const rC = RING_CENTER_R * eReveal;
       const rW = RING_W * eReveal;
-      const outBand = dist >= rC + rW - 2 && dist <= rC + 2 * rW + 2;
-      const inBand = dist >= rC - 2 && dist <= rC + rW + 2;
-      // sat ring is INNER, alpha ring is OUTER; the center plate is a dead zone
-      const band: 'alpha' | 'sat' | null = dist < rC - 3 ? null : (inBand ? 'sat' : outBand ? 'alpha' : null);
+      const satIn = (RING_CENTER_R + RING_INNER_GAP) * eReveal;
+      const satOut = satIn + rW;
+      const alpIn = (RING_CENTER_R + RING_INNER_GAP + RING_W + RING_MID_GAP) * eReveal;
+      const alpOut = alpIn + rW;
+      // sat ring is INNER, alpha ring is OUTER; the gaps and center plate are dead zones
+      const band: 'alpha' | 'sat' | null = dist < rC - 3 ? null
+        : (dist >= satIn - 2 && dist <= satOut + 2 ? 'sat'
+          : dist >= alpIn - 2 && dist <= alpOut + 2 ? 'alpha' : null);
       if (band !== ringBand) {
         ringBand = band;
         ringBandStartAngle = band ? ringAngleAt(p) : 0;

@@ -15,17 +15,16 @@ Tiny, framework-agnostic, works everywhere.
 - 🖱 **Pixel-exact picking** — CPU raycast mirrors the GPU shader exactly (same SDF, same matrix inverse)
 - 🎯 **Pick dot rings** — press & hold the picker dot (a quick click stays a normal pick): the
   **middle circle is the current color** (the enlarged pick indicator — translucent so the box
-  shows through when semi-transparent),  surrounded by two **touching, equal-width rings**. **Inner = saturation** — a single linear
-  ramp like a classic saturation slider: **black at 12 o'clock → the current color at 6 o'clock →
-  white back at 12 o'clock** (hue preserved); a **thumb knob** (color ring + white core) shows the
-  position. **Outer = alpha** — a
-  dotted track (the transparency indicator) filled SOLID up to the current value, with a thumb
-  knob marking the value; the center plate shows the actual translucency. The rings unfold after
-  holding the dot ~0.25 s (or immediately once you drag) with a quick scale + fade-in, and fold
-  back with a fade-out; the active ring follows the pointer, so
-  hovering the alpha ring never touches saturation and vice versa (a ~10° rotation guard ignores
-  purely radial crossings); release folds them back. Semi-transparent colors show an 8-digit
-  `#RRGGBBAA` hex
+  shows through when semi-transparent), then a **small gap**, the **inner = saturation** ring — a
+  single linear ramp like a classic saturation slider: **white at 12 o'clock → the current color
+  at 6 o'clock → black at 3 o'clock** (hue preserved) — then a **wider gap** and the **outer =
+  alpha** ring: a dotted track (the transparency indicator) filled SOLID up to the current value.
+  Both rings carry **white thumb knobs** (white ring + white center dot); the center plate shows
+  the actual translucency. The rings unfold after holding the dot ~0.25 s (or immediately once
+  you drag) with a quick scale + fade-in, and fold back with a fade-out; the active ring follows
+  the pointer, so hovering the alpha ring never touches saturation and vice versa (a ~10° rotation
+  guard ignores purely radial crossings); release folds them back. Semi-transparent colors show an
+  8-digit `#RRGGBBAA` hex
 - 🔺 **Saturation triangle** (optional, off by default — SV Triangle toggle): hold **Shift** to reveal
   a current-color / white / black triangle overlaid on the cube; dragging inside it adjusts
   saturation & brightness while preserving hue (barycentric mix, exact GPU gradient). A marker dot
@@ -122,7 +121,7 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | Gesture | Action |
 | --- | --- |
 | Left click / drag on box | pick color & move the picker dot |
-| **Press & hold the pick dot** (quick click = normal pick) | rings unfold after holding ~0.25s (or immediately on drag): middle circle = current color + two touching rings — inner = saturation (linear ramp: black at 12 o'clock → color at 6 o'clock → white), outer = alpha (dotted track, solid fill up to the value, thumb knob at the end); the active ring follows the pointer, rotate to set (≥10° guard ignores radial crossings), release to fold |
+| **Press & hold the pick dot** (quick click = normal pick) | rings unfold after holding ~0.25s (or immediately on drag): middle circle = current color, then a gap, inner = saturation (linear ramp: white at 12 o'clock → color at 6 o'clock → black at 3 o'clock), a wider gap, outer = alpha (dotted track, solid fill up to the value, thumb knob at the end); white thumb knobs on both rings; the active ring follows the pointer, rotate to set (≥10° guard ignores radial crossings), release to fold |
 | Left drag on **empty area** | orbit the viewport (grab cursor) |
 | Middle drag / Alt + Left drag | free 360° viewport orbit (Blender style) |
 | Mouse wheel | smooth zoom (0.2× – 2.5×) |
