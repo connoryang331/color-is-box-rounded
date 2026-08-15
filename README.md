@@ -21,7 +21,8 @@ Tiny, framework-agnostic, works everywhere.
   position. **Outer = alpha** — a
   dotted track (the transparency indicator) filled SOLID up to the current value, with a thumb
   knob marking the value; the center plate shows the actual translucency. The rings unfold after
-  holding the dot ~0.25 s (or immediately once you drag); the active ring follows the pointer, so
+  holding the dot ~0.25 s (or immediately once you drag) with a quick scale + fade-in, and fold
+  back with a fade-out; the active ring follows the pointer, so
   hovering the alpha ring never touches saturation and vice versa (a ~10° rotation guard ignores
   purely radial crossings); release folds them back. Semi-transparent colors show an 8-digit
   `#RRGGBBAA` hex

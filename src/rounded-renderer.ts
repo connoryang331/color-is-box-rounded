@@ -531,7 +531,9 @@ export function renderRoundedBox(
     const start = -Math.PI / 2; // 12 o'clock = 0%
 
     overlayCtx.save();
-    overlayCtx.globalAlpha = Math.min(1, ease + 0.15);
+    // Fade in / out with the reveal: the whole widget (rings, knob, labels, band edges)
+    // fades from 0 to 1 opacity as it unfolds, and back to 0 as it folds.
+    overlayCtx.globalAlpha = ease;
 
     // Fine dot-grid texture across the band — the "transparent" indicator, matching the
     // reference slider look (dotted track with the solid fill up to the current value).

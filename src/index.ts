@@ -155,6 +155,8 @@ export function createRoundedBoxPicker(
       if (Math.abs(ringReveal - ringRevealTarget) < 0.001) {
         ringReveal = ringRevealTarget;
         ringAnimFrame = null;
+        // Fold finished: release the ring anchor so the regular pick dot renders again.
+        if (ringRevealTarget === 0) ringAnchor = null;
       } else {
         ringAnimFrame = requestAnimationFrame(step);
       }
