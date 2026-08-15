@@ -372,8 +372,12 @@
         const dx = e.clientX - startX;
         if (Math.abs(dx) > 0) {
           hasMoved = true;
-          const speed = e.shiftKey ? 0.002 : 0.008;
-          const newVal = Math.max(minVal, Math.min(maxVal, parseFloat((startVal + dx * speed).toFixed(stepPrecision))));
+          const range = maxVal - minVal;
+          // Dynamic responsive drag speed based on value span
+          const speedMultiplier = range > 10 ? (range / 200) : (range / 250);
+          const speed = (e.shiftKey ? 0.2 : 1.0) * speedMultiplier;
+          const rawVal = startVal + dx * speed;
+          const newVal = Math.max(minVal, Math.min(maxVal, stepPrecision === 0 ? Math.round(rawVal) : parseFloat(rawVal.toFixed(stepPrecision))));
           setFn(newVal);
           input.value = newVal.toFixed(stepPrecision) + unit;
           updateBar(newVal);
