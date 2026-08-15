@@ -493,22 +493,8 @@ export function renderRoundedBox(
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
 
-    // Checkerboard underlay reveals transparency when alpha < 100% (clipped to the dot)
-    if (alpha < 1) {
-      overlayCtx.save();
-      overlayCtx.beginPath();
-      overlayCtx.arc(dotPos.x, dotPos.y, 6, 0, Math.PI * 2);
-      overlayCtx.clip();
-      const cs = 4;
-      for (let gy = -12; gy < 12; gy += cs) {
-        for (let gx = -12; gx < 12; gx += cs) {
-          overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
-          overlayCtx.fillRect(dotPos.x + gx, dotPos.y + gy, cs, cs);
-        }
-      }
-      overlayCtx.restore();
-    }
-
+    // The dot always shows the current color itself: opaque when alpha = 100%, translucent
+    // (box showing through) when semi-transparent — no checkerboard pattern inside.
     overlayCtx.beginPath();
     overlayCtx.arc(dotPos.x, dotPos.y, 8, 0, Math.PI * 2);
     overlayCtx.fillStyle = alpha < 1
