@@ -134,10 +134,10 @@ export function createRoundedBoxPicker(
   // engage the sat ring on the way out; the center plate is a dead zone.)
   let ringBandStartAngle = 0;
   let ringEngaged = false;
-  // The saturation ring is the C / white / black triangle perimeter wrapped into a circle:
-  // top = anchor color, right = black, bottom = gray, left = white (hue preserved).
+  // The saturation ring is a linear ramp like the classic saturation slider:
+  // black at 12 o'clock → the anchor color at 6 o'clock → white at 12 o'clock (hue preserved).
   let ringColorAnchor: Vec3 | null = null; // color captured at press (the ring's C vertex)
-  let ringAngle = 0;                       // current marker angle, radians clockwise from 12 o'clock
+  let ringAngle = Math.PI;                 // current marker angle (starts at the anchor color, 6 o'clock)
   let ringReveal = 0;
   let ringRevealTarget = 0;
   let ringAnimFrame: number | null = null;
@@ -428,7 +428,7 @@ export function createRoundedBoxPicker(
         ringAnchor = dotScreenPos();
         ringBand = null;
         ringColorAnchor = { ...dotValues };
-        ringAngle = 0;
+        ringAngle = Math.PI; // the anchor color sits at 6 o'clock (middle of the black→C→white ramp)
         svAnchor = null;
         svMix = null;
         e.preventDefault();

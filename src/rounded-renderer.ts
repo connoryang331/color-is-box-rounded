@@ -581,10 +581,10 @@ export function renderRoundedBox(
       overlayCtx.fillText(text, x, y);
     };
 
-    // INNER ring — SATURATION: the C / white / black triangle perimeter wrapped into a ring
-    // (top = anchor color, right = black, bottom = gray, left = white), hugging the center
-    // color. Dragging around it sets the color to the ring color at the pointer angle (hue
-    // preserved); a marker dot shows the current position on the ring.
+    // INNER ring — SATURATION: a linear ramp like the classic saturation slider — black at
+    // 12 o'clock, the anchor color at 6 o'clock, white back at 12 o'clock (hue preserved),
+    // hugging the center color. Dragging around it sets the color to the ring color at the
+    // pointer angle; a marker dot shows the current position on the ring.
     const anchorValues = ring.colorAnchor || dotValues;
     const anchorRgb = valuesToRgb(anchorValues, mode);
     const nSeg = 72;

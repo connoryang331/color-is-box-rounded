@@ -15,10 +15,9 @@ Tiny, framework-agnostic, works everywhere.
 - 🖱 **Pixel-exact picking** — CPU raycast mirrors the GPU shader exactly (same SDF, same matrix inverse)
 - 🎯 **Pick dot rings** — press & hold the picker dot (a quick click stays a normal pick): the
   **middle circle is the current color** (the enlarged pick indicator — translucent so the box
-  shows through when semi-transparent), surrounded by two **touching, equal-width rings**.
-  **Inner = saturation** — the C / white / black triangle perimeter wrapped into a full gradient
-  ring (top = current color, left = white, right = black, bottom = gray); rotating around the dot
-  walks that loop (hue preserved, marker dot shows the position). **Outer = alpha** — a
+  shows through when semi-transparent),  surrounded by two **touching, equal-width rings**. **Inner = saturation** — a single linear
+  ramp like a classic saturation slider: **black at 12 o'clock → the current color at 6 o'clock →
+  white back at 12 o'clock** (hue preserved, marker dot shows the position). **Outer = alpha** — a
   dotted track (the transparency indicator) filled SOLID up to the current value, with a thumb
   knob marking the value; the center plate shows the actual translucency. The rings unfold after
   holding the dot ~0.25 s (or immediately once you drag); the active ring follows the pointer, so
@@ -121,7 +120,7 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | Gesture | Action |
 | --- | --- |
 | Left click / drag on box | pick color & move the picker dot |
-| **Press & hold the pick dot** (quick click = normal pick) | rings unfold after holding ~0.25s (or immediately on drag): middle circle = current color + two touching rings — inner = saturation (gradient: top color, left white, right black, bottom gray), outer = alpha (dotted track, solid fill up to the value, thumb knob at the end); the active ring follows the pointer, rotate to set (≥10° guard ignores radial crossings), release to fold |
+| **Press & hold the pick dot** (quick click = normal pick) | rings unfold after holding ~0.25s (or immediately on drag): middle circle = current color + two touching rings — inner = saturation (linear ramp: black at 12 o'clock → color at 6 o'clock → white), outer = alpha (dotted track, solid fill up to the value, thumb knob at the end); the active ring follows the pointer, rotate to set (≥10° guard ignores radial crossings), release to fold |
 | Left drag on **empty area** | orbit the viewport (grab cursor) |
 | Middle drag / Alt + Left drag | free 360° viewport orbit (Blender style) |
 | Mouse wheel | smooth zoom (0.2× – 2.5×) |
