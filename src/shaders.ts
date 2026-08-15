@@ -8,6 +8,29 @@ void main() {
 }
 `;
 
+// Gouraud-shaded triangle for the saturation picker: each fragment receives the exact
+// barycentric mix of the three vertex colors (C · a + white · b + black · g), which is
+// precisely the PS-style saturation/brightness gradient we want inside the triangle.
+// (Canvas 2D linear gradients cannot interpolate across three vertices; GL varyings can.)
+export const TRI_VERT_SHADER = `
+attribute vec2 a_pos;
+attribute vec3 a_color;
+varying vec3 v_color;
+void main() {
+  v_color = a_color;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+`;
+
+export const TRI_FRAG_SHADER = `
+precision mediump float;
+varying vec3 v_color;
+uniform float u_alpha;
+void main() {
+  gl_FragColor = vec4(v_color, u_alpha);
+}
+`;
+
 export const FRAG_SHADER = `
 precision highp float;
 varying vec2 vUv;

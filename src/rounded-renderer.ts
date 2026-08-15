@@ -1,8 +1,8 @@
 import type { Vec2, Vec3, ColorMode, RGBColor, GuideVisibility, EdgeStyleConfig } from './types';
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
-import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D, transform3D, projectSaturationTriangle } from './camera-math';
+import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D, transform3D, projectSaturationTriangle, SaturationTriangle } from './camera-math';
 import { drawGuides } from './guide-renderer';
-import { VERT_SHADER, FRAG_SHADER } from './shaders';
+import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
 import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb } from './color-math';
 
 export interface WebGLRenderContext {
@@ -14,6 +14,14 @@ export interface WebGLRenderContext {
   height: number;
   program: WebGLProgram;
   uniforms: Record<string, WebGLUniformLocation>;
+  // Gouraud triangle program (saturation picker gradient) + its geometry
+  posBuffer: WebGLBuffer;
+  posAttr: number;
+  triProgram: WebGLProgram;
+  triPosAttr: number;
+  triColorAttr: number;
+  triAlphaLoc: WebGLUniformLocation;
+  triBuffer: WebGLBuffer;
 }
 
 export function initWebGL(container: HTMLElement, size: number): WebGLRenderContext {
@@ -87,6 +95,18 @@ export function initWebGL(container: HTMLElement, size: number): WebGLRenderCont
   gl.enableVertexAttribArray(posAttr);
   gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
 
+  // Triangle program: position + per-vertex color (Gouraud) for the saturation picker gradient
+  const triVert = createShader(gl.VERTEX_SHADER, TRI_VERT_SHADER);
+  const triFrag = createShader(gl.FRAGMENT_SHADER, TRI_FRAG_SHADER);
+  const triProgram = gl.createProgram()!;
+  gl.attachShader(triProgram, triVert);
+  gl.attachShader(triProgram, triFrag);
+  gl.linkProgram(triProgram);
+  const triPosAttr = gl.getAttribLocation(triProgram, 'a_pos');
+  const triColorAttr = gl.getAttribLocation(triProgram, 'a_color');
+  const triAlphaLoc = gl.getUniformLocation(triProgram, 'u_alpha')!;
+  const triBuffer = gl.createBuffer();
+
   // Uniform locations
   const uniforms: Record<string, WebGLUniformLocation> = {
     u_resolution: gl.getUniformLocation(program, 'u_resolution')!,
@@ -116,6 +136,13 @@ export function initWebGL(container: HTMLElement, size: number): WebGLRenderCont
     height: size,
     program,
     uniforms,
+    posBuffer,
+    posAttr,
+    triProgram,
+    triPosAttr,
+    triColorAttr,
+    triAlphaLoc,
+    triBuffer,
   };
 }
 
@@ -272,12 +299,56 @@ export function renderRoundedBox(
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+  // Projected saturation triangle (shared by the GL gradient fill and the 2D overlay)
+  const scale = width * 0.36;
+  const center: Vec2 = { x: width * 0.5, y: height * 0.5 };
+  let svTri: SaturationTriangle | null = null;
+  if (guides.svTriangle) {
+    const tri = projectSaturationTriangle(svAnchor || dotValues, mode, scale, center, cam, box);
+    // Skip degenerate triangles (gray / white / black current color → C lies on the W–K edge)
+    const area = Math.abs((tri.w.x - tri.c.x) * (tri.k.y - tri.c.y) - (tri.w.y - tri.c.y) * (tri.k.x - tri.c.x));
+    if (area > 4) svTri = tri;
+  }
+
+  // 1.5 Saturation Triangle Gradient Fill (exact Gouraud shading on the GPU):
+  // vertex colors C / white / black, so each pixel shows the true mix a·C + b·white + g·black —
+  // the PS-style gradient from the current color toward white and toward black.
+  if (svTri) {
+    const toClip = (p: Vec2): [number, number] => [
+      (p.x / width) * 2 - 1,
+      1 - (p.y / height) * 2,
+    ];
+    const c = toClip(svTri.c);
+    const w = toClip(svTri.w);
+    const k = toClip(svTri.k);
+    gl.useProgram(rc.triProgram);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.bindBuffer(gl.ARRAY_BUFFER, rc.triBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      c[0], c[1], svTri.cRGB.x, svTri.cRGB.y, svTri.cRGB.z,
+      w[0], w[1], 1, 1, 1,
+      k[0], k[1], 0, 0, 0,
+    ]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(rc.triPosAttr);
+    gl.vertexAttribPointer(rc.triPosAttr, 2, gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(rc.triColorAttr);
+    gl.vertexAttribPointer(rc.triColorAttr, 3, gl.FLOAT, false, 20, 8);
+    gl.uniform1f(rc.triAlphaLoc, 1.0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disable(gl.BLEND);
+    // Restore the main raymarching program + its quad attribute state for the next frame.
+    // a_pos and position often share attribute location 0, so re-enable + re-point it explicitly
+    // (otherwise the box quad loses its position data and stops rendering from the next frame on).
+    gl.useProgram(program);
+    gl.enableVertexAttribArray(rc.posAttr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, rc.posBuffer);
+    gl.vertexAttribPointer(rc.posAttr, 2, gl.FLOAT, false, 0, 0);
+  }
+
   // 2. Render 2D Overlay (12 Edges, Spatial Guides & Pick Dot)
   overlayCtx.save();
   overlayCtx.clearRect(0, 0, width, height);
-
-  const scale = width * 0.36;
-  const center: Vec2 = { x: width * 0.5, y: height * 0.5 };
 
   // 2.1 Draw 12 Cube Edges & Corner Arcs (Crisp 2D Vector)
   draw12Edges(overlayCtx, scale, center, cam, box, edgeStyle);
@@ -285,32 +356,25 @@ export function renderRoundedBox(
   // 2.2 Draw Spatial Guides
   drawGuides(overlayCtx, scale, center, cam, box, guides);
 
-  // 2.2b Saturation Triangle (current color / white / black) — a draggable plane that mixes
-  // the current color toward the gray axis: interior points keep the hue, saturation & brightness
-  // are reduced toward the W–K edge. Orthographic projection preserves barycentric coordinates.
-  // During a drag the geometry anchors to the drag-start color (svAnchor) for stability.
-  if (guides.svTriangle) {
-    const tri = projectSaturationTriangle(svAnchor || dotValues, mode, scale, center, cam, box);
-    // Skip degenerate triangles (gray / white / black current color → C lies on the W–K edge)
-    const area = Math.abs((tri.w.x - tri.c.x) * (tri.k.y - tri.c.y) - (tri.w.y - tri.c.y) * (tri.k.x - tri.c.x));
-    if (area > 4) {
-      const cr = Math.round(tri.cRGB.x * 255);
-      const cg = Math.round(tri.cRGB.y * 255);
-      const cb = Math.round(tri.cRGB.z * 255);
+  // 2.2b Saturation Triangle overlay — edges, vertex markers & position marker on top of the
+  // GL gradient fill. The fill itself is GPU Gouraud-shaded (see 1.5); here we only outline the
+  // triangle and mark its vertices so it reads as an interactive picker surface.
+  if (svTri) {
+    const tri = svTri;
+    const cr = Math.round(tri.cRGB.x * 255);
+    const cg = Math.round(tri.cRGB.y * 255);
+    const cb = Math.round(tri.cRGB.z * 255);
 
-      overlayCtx.save();
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(tri.c.x, tri.c.y);
-      overlayCtx.lineTo(tri.w.x, tri.w.y);
-      overlayCtx.lineTo(tri.k.x, tri.k.y);
-      overlayCtx.closePath();
-      // Subtle tinted fill so the plane reads as "the current color's hue plane"
-      overlayCtx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, 0.12)`;
-      overlayCtx.fill();
-      overlayCtx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, 0.7)`;
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.setLineDash([]);
-      overlayCtx.stroke();
+    overlayCtx.save();
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(tri.c.x, tri.c.y);
+    overlayCtx.lineTo(tri.w.x, tri.w.y);
+    overlayCtx.lineTo(tri.k.x, tri.k.y);
+    overlayCtx.closePath();
+    overlayCtx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, 0.7)`;
+    overlayCtx.lineWidth = 1.2;
+    overlayCtx.setLineDash([]);
+    overlayCtx.stroke();
 
       // Vertex markers: white corner (white fill + dark ring), black corner (dark fill + light ring)
       overlayCtx.beginPath();
@@ -344,7 +408,6 @@ export function renderRoundedBox(
       }
 
       overlayCtx.restore();
-    }
   }
 
   // 2.2 Draw Pick Dot
