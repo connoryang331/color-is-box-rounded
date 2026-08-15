@@ -472,6 +472,14 @@ export function renderRoundedBox(
       overlayCtx.restore();
   }
 
+  // Contrast-aware outline for the pick dot / center plate: a dark ring on light colors and a
+  // light ring on dark colors, so the indicator stays visible at ANY color — including the
+  // default white (a white dot with a white ring would vanish into the white corner).
+  const outlineFor = (r: number, g: number, b: number): string => {
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    return lum > 140 ? 'rgba(17, 24, 39, 0.85)' : 'rgba(255, 255, 255, 0.95)';
+  };
+
   // 2.2 Draw Pick Dot
   // Skipped while the triangle marker is active: the marker (a·C + b·W + g·K projection) lands
   // exactly on the pick dot (barycentric coords are preserved by the orthographic projection),
@@ -503,7 +511,7 @@ export function renderRoundedBox(
       ? `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`
       : `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
     overlayCtx.fill();
-    overlayCtx.strokeStyle = '#ffffff';
+    overlayCtx.strokeStyle = outlineFor(finalRgb.r, finalRgb.g, finalRgb.b);
     overlayCtx.lineWidth = 2;
     overlayCtx.stroke();
   }
@@ -623,7 +631,7 @@ export function renderRoundedBox(
       ? `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`
       : `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
     overlayCtx.fill();
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    overlayCtx.strokeStyle = outlineFor(finalRgb.r, finalRgb.g, finalRgb.b);
     overlayCtx.lineWidth = 2;
     overlayCtx.stroke();
 
