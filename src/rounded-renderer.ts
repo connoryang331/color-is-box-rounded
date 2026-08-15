@@ -240,7 +240,7 @@ export function renderRoundedBox(
   overlayCtx.save();
   overlayCtx.clearRect(0, 0, width, height);
 
-  const scale = width * 0.26 * (cam.zoom || 1.0);
+  const scale = width * 0.26;
   const center: Vec2 = { x: width * 0.5, y: height * 0.5 };
 
   // 2.1 Draw 12 Cube Edges
