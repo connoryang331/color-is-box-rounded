@@ -508,7 +508,7 @@ export function renderRoundedBox(
     overlayCtx.stroke();
   }
 
-  // 2.3 Alpha / Saturation rings (pressed pick dot): outer = saturation (HSV S), inner = alpha.
+  // 2.3 Alpha / Saturation rings (pressed pick dot): inner = saturation (HSV S), outer = alpha.
   // Rotation around the anchor sets the value (0 at 12 o'clock, clockwise); the pointer's
   // radial band picks the active ring (highlighted). Rings scale in with the reveal animation.
   if (ring && ring.reveal > 0.01) {

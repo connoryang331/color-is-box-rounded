@@ -113,22 +113,27 @@ export function createRoundedBoxPicker(
 
   // ── Alpha / Saturation rings (press & hold the pick dot) ──
   // Pressing the pick dot reveals two concentric rings around it:
-  //   outer ring = saturation (HSV S, hue + lightness kept)
-  //   inner ring = alpha
+  //   inner ring = saturation (HSV S, hue + lightness kept)
+  //   outer ring = alpha
   // The pointer's radial band selects the active ring (switchable mid-drag); rotating
   // around the anchor sets the value 0–100%. Release folds the rings back.
+  // Rings open only after holding the dot for RING_HOLD_MS or dragging > RING_ARM_MOVE px,
+  // so a quick single click (even exactly on the dot) stays a plain click and never pops them.
+  const RING_HOLD_MS = 250;
+  const RING_ARM_MOVE = 10;
   let isRingDrag = false;
+  let ringOpened = false;                  // rings currently unfolded during this drag
+  let ringArmTimer: number | null = null;  // hold-to-open timer id
+  let ringPressPt: Vec2 | null = null;     // pointer position at press (drag-escape check)
   let ringAnchor: Vec2 | null = null;      // screen-space ring center (dot position at press)
   let ringBand: 'sat' | 'alpha' | null = null;
   // Angular hysteresis: the pointer must rotate ~10° inside a band before that ring engages.
-  // Reaching the outer ring passes THROUGH the inner band radially, which doesn't rotate the
-  // pointer — so crossing never accidentally changes alpha; once engaged, fine rotation applies.
-  // The engaged ring LOCKS until release (rotating the sat ring swings its chord through the
-  // inner band, which must not steal the drag); crossing the center plate unlocks so the user
-  // can still switch rings mid-drag by dragging through the middle.
+  // The band follows the pointer distance (sat inner, alpha outer), so each ring is adjusted
+  // only while the pointer actually sits on it — moving to the alpha ring never touches the
+  // sat ring. (A radial crossing of the inner band doesn't rotate the pointer, so it can't
+  // engage the sat ring on the way out; the center plate is a dead zone.)
   let ringBandStartAngle = 0;
   let ringEngaged = false;
-  let ringLockedBand: 'sat' | 'alpha' | null = null;
   // The saturation ring is the C / white / black triangle perimeter wrapped into a circle:
   // top = anchor color, right = black, bottom = gray, left = white (hue preserved).
   let ringColorAnchor: Vec3 | null = null; // color captured at press (the ring's C vertex)
@@ -414,7 +419,12 @@ export function createRoundedBoxPicker(
       } else if (!isShiftHeld && hitDot(e.clientX, e.clientY)) {
         // Press & hold the pick dot = reveal the alpha / saturation rings (no modifier).
         // The dot is the current color's handle, so pressing it means "tune this color".
+        // Arm a hold timer instead of opening immediately: rings appear after holding
+        // still for RING_HOLD_MS (or once the pointer drags RING_ARM_MOVE px), so a quick
+        // click on the dot / cube origin behaves like any other click.
         isRingDrag = true;
+        ringOpened = false;
+        ringPressPt = toCanvas(e.clientX, e.clientY);
         ringAnchor = dotScreenPos();
         ringBand = null;
         ringColorAnchor = { ...dotValues };
@@ -422,7 +432,13 @@ export function createRoundedBoxPicker(
         svAnchor = null;
         svMix = null;
         e.preventDefault();
-        animateRing(1);
+        ringArmTimer = window.setTimeout(() => {
+          ringArmTimer = null;
+          if (isRingDrag && !ringOpened) {
+            ringOpened = true;
+            animateRing(1);
+          }
+        }, RING_HOLD_MS);
       } else if (raycastAt(e.clientX, e.clientY)) {
         // Left Click / Drag on Box surface = Color Pick (re-anchors the triangle to the new color)
         isPicking = true;
@@ -448,27 +464,32 @@ export function createRoundedBoxPicker(
   window.addEventListener('mousemove', (e) => {
     if (isRingDrag && ringAnchor) {
       const p = toCanvas(e.clientX, e.clientY);
+      // Rings not open yet: dragging past RING_ARM_MOVE px opens them immediately;
+      // otherwise the hold timer decides. Nothing is adjusted before the rings are open.
+      if (!ringOpened) {
+        if (ringPressPt && Math.hypot(p.x - ringPressPt.x, p.y - ringPressPt.y) > RING_ARM_MOVE) {
+          if (ringArmTimer !== null) {
+            window.clearTimeout(ringArmTimer);
+            ringArmTimer = null;
+          }
+          ringOpened = true;
+          animateRing(1);
+        }
+        return;
+      }
       const dist = Math.hypot(p.x - ringAnchor.x, p.y - ringAnchor.y);
       // Bands scale with the reveal animation; pointer distance picks the active ring
-      // (inner = alpha, outer = saturation), switchable mid-drag.
+      // (inner = saturation, outer = alpha), switchable mid-drag.
       const eReveal = easeInOutQuad(ringReveal);
       // Contiguous bands (no gap): inner [rC, rC+rW], outer [rC+rW, rC+2rW]
       const rC = RING_CENTER_R * eReveal;
       const rW = RING_W * eReveal;
       const outBand = dist >= rC + rW - 2 && dist <= rC + 2 * rW + 2;
       const inBand = dist >= rC - 2 && dist <= rC + rW + 2;
-      let band: 'alpha' | 'sat' | null;
-      if (dist < rC - 3) {
-        band = null; // in the center plate: no ring (unlocks the locked ring)
-      } else if (ringLockedBand) {
-        band = ringLockedBand;
-      } else {
-        // saturation ring is INNER (hugging the center color), alpha ring is OUTER
-        band = inBand ? 'sat' : outBand ? 'alpha' : null;
-      }
+      // sat ring is INNER, alpha ring is OUTER; the center plate is a dead zone
+      const band: 'alpha' | 'sat' | null = dist < rC - 3 ? null : (inBand ? 'sat' : outBand ? 'alpha' : null);
       if (band !== ringBand) {
         ringBand = band;
-        if (band === null) ringLockedBand = null; // dragged through the center: free again
         ringBandStartAngle = band ? ringAngleAt(p) : 0;
         ringEngaged = false;
       }
@@ -477,10 +498,7 @@ export function createRoundedBoxPicker(
         if (!ringEngaged) {
           let delta = Math.abs(ang - ringBandStartAngle);
           if (delta > Math.PI) delta = TWO_PI - delta; // wrap-around
-          if (delta > 10 * DEG) {
-            ringEngaged = true;
-            ringLockedBand = band;
-          }
+          if (delta > 10 * DEG) ringEngaged = true;
         }
         if (ringEngaged) {
           if (band === 'alpha') setAlphaInternal(ang / TWO_PI);
@@ -511,11 +529,16 @@ export function createRoundedBoxPicker(
 
   window.addEventListener('mouseup', () => {
     if (isRingDrag) {
+      if (ringArmTimer !== null) {
+        window.clearTimeout(ringArmTimer);
+        ringArmTimer = null;
+      }
       isRingDrag = false;
+      ringOpened = false;
+      ringPressPt = null;
       ringBand = null;
       ringBandStartAngle = 0;
       ringEngaged = false;
-      ringLockedBand = null;
       ringColorAnchor = null;
       ringAngle = 0;
       animateRing(0);
@@ -746,6 +769,7 @@ export function createRoundedBoxPicker(
       if (animId !== null) cancelAnimationFrame(animId);
       if (svAnimFrame !== null) cancelAnimationFrame(svAnimFrame);
       if (ringAnimFrame !== null) cancelAnimationFrame(ringAnimFrame);
+      if (ringArmTimer !== null) window.clearTimeout(ringArmTimer);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onWindowBlur);
