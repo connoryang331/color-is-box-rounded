@@ -57,16 +57,51 @@ export function createRoundedBoxPicker(
     listeners.forEach(cb => cb(out));
   };
 
-  // ── Blender 3D Interaction Standard ──
-  // 1. Middle Mouse Button (button === 1) or Alt + Left Click: 3D Viewport Tumble
-  // 2. Left Mouse Button (button === 0): Pick color on 3D rounded box surface
-  // 3. Mouse Wheel: 3D Zoom (0.2x ~ 2.5x)
+  // ── Blender 3D Interaction & Circular Gimbal Rings ──
+  // 1. Left Mouse Drag on Yaw Ring (Blue circle) -> Rotate Yaw (cam.rotZRad)
+  // 2. Left Mouse Drag on Pitch Ring (Red circle) -> Rotate Pitch (cam.rotXRad)
+  // 3. Middle Mouse Drag (or Alt + Left Drag) -> Free 3D Viewport Tumble
+  // 4. Left Mouse Click on Box surface -> Pick color
+  // 5. Mouse Wheel -> Zoom (0.2x ~ 2.5x)
   let isTumbling = false;
   let isPicking = false;
+  let isDraggingYawRing = false;
+  let isDraggingPitchRing = false;
   let startX = 0;
   let startY = 0;
   let startYaw = cam.rotZRad;
   let startPitch = cam.rotXRad;
+
+  // Hit test for circular rings (Yaw & Pitch)
+  const hitTestRings = (clientX: number, clientY: number): 'yaw' | 'pitch' | null => {
+    if (!guides.angleGuides && !guides.yawArc && !guides.pitchArc) return null;
+    const rect = rc.canvasGL.getBoundingClientRect();
+    const px = (clientX - rect.left) * (rc.width / rect.width);
+    const py = (clientY - rect.top) * (rc.height / rect.height);
+    const scale = rc.width * 0.26;
+    const center: Vec2 = { x: rc.width * 0.5, y: rc.height * 0.5 };
+    const project = (p: Vec3) => project3D(p, scale, center, cam, box);
+
+    // 1. Check Yaw Ring (Z=0 plane circle)
+    const yawSegments = 36;
+    for (let i = 0; i < yawSegments; i++) {
+      const a = (i / yawSegments) * Math.PI * 2;
+      const pt3: Vec3 = { x: 0.5 + Math.cos(a) * 0.75, y: 0.5 + Math.sin(a) * 0.75, z: 0 };
+      const p2d = project(pt3);
+      if (Math.hypot(px - p2d.x, py - p2d.y) < 14) return 'yaw';
+    }
+
+    // 2. Check Pitch Ring (Y=0.5 vertical circle)
+    const pitchSegments = 24;
+    for (let i = 0; i <= pitchSegments; i++) {
+      const a = -Math.PI / 2 + (i / pitchSegments) * Math.PI;
+      const pt3: Vec3 = { x: 0.5 + Math.cos(a) * 0.75, y: 0.5, z: 0.5 + Math.sin(a) * 0.75 };
+      const p2d = project(pt3);
+      if (Math.hypot(px - p2d.x, py - p2d.y) < 14) return 'pitch';
+    }
+
+    return null;
+  };
 
   // Exact 3D raycast to sample color at cursor
   const pickColorAtScreen = (clientX: number, clientY: number) => {
@@ -156,9 +191,37 @@ export function createRoundedBoxPicker(
       document.body.style.cursor = 'grabbing';
       e.preventDefault();
     } else if (e.button === 0) {
-      // Left Click = Color Pick
-      isPicking = true;
-      pickColorAtScreen(e.clientX, e.clientY);
+      // Check if clicking on Yaw or Pitch circular gimbal rings
+      const ring = hitTestRings(e.clientX, e.clientY);
+      if (ring === 'yaw') {
+        isDraggingYawRing = true;
+        startX = e.clientX;
+        startYaw = cam.rotZRad;
+        document.body.style.cursor = 'ew-resize';
+      } else if (ring === 'pitch') {
+        isDraggingPitchRing = true;
+        startY = e.clientY;
+        startPitch = cam.rotXRad;
+        document.body.style.cursor = 'ns-resize';
+      } else {
+        // Left Click = Color Pick
+        isPicking = true;
+        pickColorAtScreen(e.clientX, e.clientY);
+      }
+    }
+  });
+
+  // Hover cursor indicator for rings
+  rc.canvasGL.addEventListener('mousemove', (e) => {
+    if (!isTumbling && !isPicking && !isDraggingYawRing && !isDraggingPitchRing) {
+      const ring = hitTestRings(e.clientX, e.clientY);
+      if (ring === 'yaw') {
+        rc.canvasGL.style.cursor = 'ew-resize';
+      } else if (ring === 'pitch') {
+        rc.canvasGL.style.cursor = 'ns-resize';
+      } else {
+        rc.canvasGL.style.cursor = 'default';
+      }
     }
   });
 
@@ -174,14 +237,24 @@ export function createRoundedBoxPicker(
       cam.rotZRad = startYaw + dx * 0.01;
       cam.rotXRad = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, startPitch - dy * 0.01));
       scheduleRender();
+    } else if (isDraggingYawRing) {
+      const dx = e.clientX - startX;
+      cam.rotZRad = startYaw + dx * 0.015;
+      scheduleRender();
+    } else if (isDraggingPitchRing) {
+      const dy = e.clientY - startY;
+      cam.rotXRad = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, startPitch - dy * 0.015));
+      scheduleRender();
     } else if (isPicking) {
       pickColorAtScreen(e.clientX, e.clientY);
     }
   });
 
-  window.addEventListener('mouseup', (e) => {
-    if (isTumbling) {
+  window.addEventListener('mouseup', () => {
+    if (isTumbling || isDraggingYawRing || isDraggingPitchRing) {
       isTumbling = false;
+      isDraggingYawRing = false;
+      isDraggingPitchRing = false;
       document.body.style.cursor = 'default';
     }
     if (isPicking) {
