@@ -1,8 +1,8 @@
 import type {
   RGBColor, ColorMode, Vec3,
-  ColorOutput, ColorChangeCallback, GuideVisibility, RoundedBoxColorPicker,
+  ColorOutput, ColorChangeCallback, GuideVisibility, EdgeStyleConfig, RoundedBoxColorPicker,
 } from './types';
-import { DEFAULT_GUIDES } from './types';
+import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D } from './camera-math';
 import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb } from './color-math';
 import { initWebGL, renderRoundedBox } from './rounded-renderer';
@@ -22,8 +22,9 @@ export function createRoundedBoxPicker(
   let invert = false;
 
   let cam: CameraConfig = { ...DEFAULT_CAMERA_CONFIG };
-  let box: BoxConfig = { ...DEFAULT_BOX_CONFIG, radius: 0.08 }; // 默认优雅微倒角
+  let box: BoxConfig = { ...DEFAULT_BOX_CONFIG, radius: 0.08 };
   let guides: GuideVisibility = { ...DEFAULT_GUIDES };
+  let edgeStyle: EdgeStyleConfig = { ...DEFAULT_EDGE_CONFIG };
 
   let color: RGBColor = options.initialColor || { r: 255, g: 255, b: 255 };
   let dotValues: Vec3 = rgbToValues(color, mode);
@@ -36,7 +37,7 @@ export function createRoundedBoxPicker(
     if (animId !== null) return;
     animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, dotValues, true);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true);
     });
   };
 
@@ -56,7 +57,7 @@ export function createRoundedBoxPicker(
     listeners.forEach(cb => cb(out));
   };
 
-  // 3D Viewport Interaction (Tumble Rotation on Drag)
+  // 3D Viewport Drag Tumbling
   let isDragging = false;
   let startX = 0;
   let startY = 0;
@@ -84,7 +85,6 @@ export function createRoundedBoxPicker(
     isDragging = false;
   });
 
-  // Double click to invert
   rc.canvasGL.addEventListener('dblclick', () => {
     invert = !invert;
     notify();
@@ -134,6 +134,11 @@ export function createRoundedBoxPicker(
       cam.rotZRad = (zDeg * Math.PI) / 180;
       scheduleRender();
     },
+    setZoom: (z: number) => {
+      cam.zoom = Math.max(0.1, Math.min(3.0, z));
+      scheduleRender();
+    },
+    getZoom: () => cam.zoom || 1.0,
     setDimensions: (x: number, y: number, z: number) => {
       box.sizeX = Math.max(0.2, Math.min(2.5, x));
       box.sizeY = Math.max(0.2, Math.min(2.5, y));
@@ -146,6 +151,11 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getRadius: () => box.radius,
+    getEdgeStyle: () => ({ ...edgeStyle }),
+    setEdgeStyle: (style: Partial<EdgeStyleConfig>) => {
+      edgeStyle = { ...edgeStyle, ...style };
+      scheduleRender();
+    },
     getGuides: () => ({ ...guides }),
     setGuides: (g: Partial<GuideVisibility>) => {
       guides = { ...guides, ...g };

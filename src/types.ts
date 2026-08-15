@@ -46,6 +46,32 @@ export interface AxisLock {
   z: boolean;
 }
 
+export interface EdgeStyleConfig {
+  showFront: boolean;      // 显示前侧可见边（Front Edges）
+  showBack: boolean;       // 显示后侧被遮挡暗边（Back / Hidden Edges 透视线）
+  frontWidth: number;      // 前侧边线粗细 (px)
+  backWidth: number;       // 后侧边线粗细 (px)
+  frontDashed: boolean;    // 前侧边线是否虚线
+  backDashed: boolean;     // 后侧边线是否虚线
+  frontColor: string;      // 前侧边线颜色
+  backColor: string;       // 后侧边线颜色
+  frontOpacity: number;    // 前侧边透明度 0..1
+  backOpacity: number;     // 后侧边透明度 0..1
+}
+
+export const DEFAULT_EDGE_CONFIG: EdgeStyleConfig = {
+  showFront: true,
+  showBack: true,
+  frontWidth: 1.5,
+  backWidth: 1.0,
+  frontDashed: false,
+  backDashed: true,
+  frontColor: '#ffffff',
+  backColor: '#ffffff',
+  frontOpacity: 0.65,
+  backOpacity: 0.25,
+};
+
 export interface GuideVisibility {
   vertexX: boolean;
   vertexY: boolean;
@@ -88,10 +114,14 @@ export interface RoundedBoxColorPicker {
   setRotation(yawDeg: number, pitchDeg: number): void;
   getAxisRotation(): { rotXDeg: number; rotYDeg: number; rotZDeg: number };
   setAxisRotation(xDeg: number, yDeg: number, zDeg: number): void;
+  setZoom(z: number): void;
+  getZoom(): number;
   setDimensions(x: number, y: number, z: number): void;
   getDimensions(): { sizeX: number; sizeY: number; sizeZ: number };
   setRadius(r: number): void;
   getRadius(): number;
+  getEdgeStyle(): EdgeStyleConfig;
+  setEdgeStyle(style: Partial<EdgeStyleConfig>): void;
   getGuides(): GuideVisibility;
   setGuides(g: Partial<GuideVisibility>): void;
   toggleAllGuides(visible?: boolean): void;

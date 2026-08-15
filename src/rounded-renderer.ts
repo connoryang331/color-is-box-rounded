@@ -1,5 +1,5 @@
-import type { Vec2, Vec3, ColorMode, RGBColor, GuideVisibility } from './types';
-import { DEFAULT_GUIDES } from './types';
+import type { Vec2, Vec3, ColorMode, RGBColor, GuideVisibility, EdgeStyleConfig } from './types';
+import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D, transform3D } from './camera-math';
 import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER } from './shaders';
@@ -34,7 +34,7 @@ export function initWebGL(container: HTMLElement, size: number): WebGLRenderCont
   canvasGL.style.left = '0';
   canvasGL.style.top = '0';
 
-  // 2. 2D Overlay Canvas (for Guides, Axes & Pick Dot)
+  // 2. 2D Overlay Canvas (for Guides, 12 Edges, Axes & Pick Dot)
   const canvasOverlay = document.createElement('canvas');
   canvasOverlay.width = size * dpr;
   canvasOverlay.height = size * dpr;
@@ -110,6 +110,102 @@ export function initWebGL(container: HTMLElement, size: number): WebGLRenderCont
   };
 }
 
+const EDGE_TOPOLOGY: { edge: [number, number]; normalA: Vec3; normalB: Vec3 }[] = [
+  // 底面 4 条边 (z=0)
+  { edge: [0, 1], normalA: { x: 0, y: 0, z: -1 }, normalB: { x: 0, y: -1, z: 0 } },
+  { edge: [1, 4], normalA: { x: 0, y: 0, z: -1 }, normalB: { x: 1, y: 0, z: 0 } },
+  { edge: [4, 2], normalA: { x: 0, y: 0, z: -1 }, normalB: { x: 0, y: 1, z: 0 } },
+  { edge: [2, 0], normalA: { x: 0, y: 0, z: -1 }, normalB: { x: -1, y: 0, z: 0 } },
+
+  // 顶面 4 条边 (z=1)
+  { edge: [3, 5], normalA: { x: 0, y: 0, z: 1 }, normalB: { x: 0, y: -1, z: 0 } },
+  { edge: [5, 7], normalA: { x: 0, y: 0, z: 1 }, normalB: { x: 1, y: 0, z: 0 } },
+  { edge: [7, 6], normalA: { x: 0, y: 0, z: 1 }, normalB: { x: 0, y: 1, z: 0 } },
+  { edge: [6, 3], normalA: { x: 0, y: 0, z: 1 }, normalB: { x: -1, y: 0, z: 0 } },
+
+  // 4 条纵向立柱边
+  { edge: [0, 3], normalA: { x: -1, y: 0, z: 0 }, normalB: { x: 0, y: -1, z: 0 } },
+  { edge: [1, 5], normalA: { x: 1, y: 0, z: 0 }, normalB: { x: 0, y: -1, z: 0 } },
+  { edge: [4, 7], normalA: { x: 1, y: 0, z: 0 }, normalB: { x: 0, y: 1, z: 0 } },
+  { edge: [2, 6], normalA: { x: -1, y: 0, z: 0 }, normalB: { x: 0, y: 1, z: 0 } },
+];
+
+function draw12Edges(
+  ctx: CanvasRenderingContext2D,
+  scale: number,
+  center: Vec2,
+  cam: CameraConfig,
+  box: BoxConfig,
+  style: EdgeStyleConfig,
+): void {
+  if (!style.showFront && !style.showBack) return;
+
+  const project = (p: Vec3) => project3D(p, scale, center, cam, box);
+
+  const verts3: Vec3[] = [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+    { x: 0, y: 0, z: 1 },
+    { x: 1, y: 1, z: 0 },
+    { x: 1, y: 0, z: 1 },
+    { x: 0, y: 1, z: 1 },
+    { x: 1, y: 1, z: 1 },
+  ];
+
+  const verts2d = verts3.map(project);
+
+  const isNormFront = (n: Vec3) => {
+    const c0 = transform3D({ x: 0.5, y: 0.5, z: 0.5 }, cam, box);
+    const c1 = transform3D({ x: 0.5 + n.x * 0.1, y: 0.5 + n.y * 0.1, z: 0.5 + n.z * 0.1 }, cam, box);
+    return (c1.z - c0.z) > 0;
+  };
+
+  ctx.save();
+
+  // 1. Back Edges
+  if (style.showBack) {
+    ctx.lineWidth = style.backWidth;
+    if (style.backDashed) ctx.setLineDash([4, 3]);
+    else ctx.setLineDash([]);
+    ctx.strokeStyle = style.backColor;
+    ctx.globalAlpha = style.backOpacity;
+
+    for (const item of EDGE_TOPOLOGY) {
+      const isFront = isNormFront(item.normalA) || isNormFront(item.normalB);
+      if (!isFront) {
+        const [a, b] = item.edge;
+        ctx.beginPath();
+        ctx.moveTo(verts2d[a].x, verts2d[a].y);
+        ctx.lineTo(verts2d[b].x, verts2d[b].y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // 2. Front Edges
+  if (style.showFront) {
+    ctx.lineWidth = style.frontWidth;
+    if (style.frontDashed) ctx.setLineDash([4, 3]);
+    else ctx.setLineDash([]);
+    ctx.strokeStyle = style.frontColor;
+    ctx.globalAlpha = style.frontOpacity;
+
+    for (const item of EDGE_TOPOLOGY) {
+      const isFront = isNormFront(item.normalA) || isNormFront(item.normalB);
+      if (isFront) {
+        const [a, b] = item.edge;
+        ctx.beginPath();
+        ctx.moveTo(verts2d[a].x, verts2d[a].y);
+        ctx.lineTo(verts2d[b].x, verts2d[b].y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
 export function renderRoundedBox(
   rc: WebGLRenderContext,
   cam: CameraConfig,
@@ -117,6 +213,7 @@ export function renderRoundedBox(
   mode: ColorMode,
   invert: boolean,
   guides: GuideVisibility,
+  edgeStyle: EdgeStyleConfig,
   dotValues: Vec3,
   dotVisible: boolean,
 ): void {
@@ -139,15 +236,20 @@ export function renderRoundedBox(
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // 2. Render 2D Guides & Pick Dot overlay
+  // 2. Render 2D Overlay (12 Edges, Guides & Pick Dot)
   overlayCtx.save();
   overlayCtx.clearRect(0, 0, width, height);
 
   const scale = width * 0.28 * (cam.zoom || 1.0);
   const center: Vec2 = { x: width * 0.5, y: height * 0.5 };
 
+  // 2.1 Draw 12 Cube Edges
+  draw12Edges(overlayCtx, scale, center, cam, box, edgeStyle);
+
+  // 2.2 Draw Spatial Guides
   drawGuides(overlayCtx, scale, center, cam, box, guides);
 
+  // 2.3 Draw Pick Dot
   if (dotVisible) {
     const dotPos = project3D(dotValues, scale, center, cam, box);
     const rgb = valuesToRgb(dotValues, mode);

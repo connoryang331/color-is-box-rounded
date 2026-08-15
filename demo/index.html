@@ -17,6 +17,7 @@
   .rows { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .row { display: flex; align-items: center; padding: 7px 0; }
   .row .label { font-size: 12px; font-weight: 600; color: #6b7280; letter-spacing: .01em; width: 62px; flex-shrink: 0; }
+  /* Left aligned values - strictly vertically aligned */
   .row .val { font: 12.5px/1.5 ui-monospace, "SF Mono", "Cascadia Code", monospace; color: #111827; letter-spacing: .01em; text-align: left; margin-left: 0; flex: 1; }
 
   /* Blender-style numeric slider (Light Clean White Theme) */
@@ -131,7 +132,7 @@
 </head>
 <body>
   <div class="panel-info" id="current-card" style="width: 320px;">
-    <h3>Rounded Bevel 3D Box</h3>
+    <h3>Current color & Guides</h3>
     <div class="rows">
       <div class="row"><span class="label">HEX</span><span class="val" id="v-hex">#ffffff</span></div>
       <div class="row"><span class="label">RGB</span><span class="val" id="v-rgb">255, 255, 255</span></div>
@@ -161,8 +162,15 @@
         </div>
       </div>
 
-      <!-- 3D Box Dimensions (长方体与倒角控制) -->
+      <!-- 3D Box Dimensions (长方体三轴独立拉伸与倒角控制) -->
       <div class="row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e5e7eb;">
+        <span class="label" style="color: #6366f1;">ZOOM</span>
+        <div class="blender-slider" id="slider-zoom">
+          <div class="bar" style="background: #6366f1; opacity: 0.22;"></div>
+          <input type="text" id="v-zoom" value="1.00x">
+        </div>
+      </div>
+      <div class="row">
         <span class="label" style="color: #ef4444;">SIZE X</span>
         <div class="blender-slider rot-x" id="slider-size-x">
           <div class="bar"></div>
@@ -230,6 +238,46 @@
           <label class="guide-toggle-item" style="grid-column: span 2;"><input type="checkbox" id="g-angles" checked>📐 Yaw & Pitch Angles</label>
         </div>
       </div>
+
+      <!-- 12 Cube Edges Style Controls (Front & Back/Hidden Edges) -->
+      <div class="guides-panel" style="margin-top: 10px; padding-top: 10px;">
+        <div class="guide-header">
+          <span>12 Cube Edges</span>
+          <div class="btn-all-group">
+            <button class="btn-mini" id="btn-toggle-front" title="Toggle Front Edges">Front</button>
+            <button class="btn-mini" id="btn-toggle-back" title="Toggle Back Edges">Back</button>
+            <button class="btn-mini" id="btn-toggle-edges" title="Toggle All Edges">All</button>
+          </div>
+        </div>
+        
+        <!-- Front Edges (前侧可见边) -->
+        <div style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin: 4px 0 2px 0;">Front Edges (Visible)</div>
+        <div class="guide-grid" style="margin-bottom: 4px;">
+          <label class="guide-toggle-item"><input type="checkbox" id="ef-vis" checked>Show Front</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="ef-dash">Dashed</label>
+        </div>
+        <div class="row" style="padding: 2px 0;">
+          <span class="label" style="font-size: 11px;">FRONT WIDTH</span>
+          <div class="blender-slider" id="slider-ef-w" style="width: 115px; height: 22px;">
+            <div class="bar" style="background: #e5e7eb;"></div>
+            <input type="text" id="v-ef-w" value="1.5px" style="font-size: 11px; line-height: 22px;">
+          </div>
+        </div>
+
+        <!-- Back / Hidden Edges (后侧暗部透视边) -->
+        <div style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin: 8px 0 2px 0; padding-top: 4px; border-top: 1px dashed #e5e7eb;">Back Edges (Hidden / Wireframe)</div>
+        <div class="guide-grid" style="margin-bottom: 4px;">
+          <label class="guide-toggle-item"><input type="checkbox" id="eb-vis" checked>Show Back</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="eb-dash" checked>Dashed</label>
+        </div>
+        <div class="row" style="padding: 2px 0;">
+          <span class="label" style="font-size: 11px;">BACK WIDTH</span>
+          <div class="blender-slider" id="slider-eb-w" style="width: 115px; height: 22px;">
+            <div class="bar" style="background: #9ca3af;"></div>
+            <input type="text" id="v-eb-w" value="1.0px" style="font-size: 11px; line-height: 22px;">
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -240,12 +288,13 @@
   </div>
 
   <div class="panel-info" id="how-card">
-    <h3>True 3D Bevel Architecture</h3>
+    <h3>How to use & 3D Features</h3>
     <ul class="tips" style="padding-left: 16px; margin: 0; font-size: 11px; line-height: 1.6; color: #4b5563;">
-      <li><b>GPU Raymarching Shader</b>: SDF <code>sdRoundBox</code> 物理级真实倒角曲面</li>
-      <li><b>Zero Mesh Seams</b>: 8 个球角与 12 根圆柱棱边无缝闭合，绝无漏光与空白</li>
-      <li><b>RGB Continuous Interpolation</b>: 倒角圆弧处色彩平滑连续三维插值</li>
-      <li><b>Ultra Fast & Lightweight</b>: 零外部依赖，极速 60FPS 渲染</li>
+      <li><b>True 3D GPU Bevel</b>: SDF <code>sdRoundBox</code> 物理级真实倒角曲面，无接缝漏光</li>
+      <li><b>Full Alignment</b>: 参数、滑块、参考线与棱边控制 100% 完全与标准版对齐</li>
+      <li><b>Drag to Scrub</b>: 左右横向拖动白色 Blender 滑块调值，或点击直接输入</li>
+      <li><b>Drag Box to Rotate</b>: 鼠标直接按住 3D 盒子在视口中自由 360° 旋转</li>
+      <li><b>Double Click</b>: 双击拾色器快速反转色相色彩空间 (白 ↔ 黑)</li>
     </ul>
   </div>
 
@@ -289,22 +338,7 @@
       picker.toggleAllGuides(false);
     });
 
-    // Presets
-    document.getElementById('btn-preset-cube').addEventListener('click', () => {
-      picker.setAxisRotation(20, 0, -30);
-      picker.setDimensions(1.0, 1.0, 1.0);
-      picker.setRadius(0.08);
-      picker.setColor({ r: 255, g: 255, b: 255 });
-    });
-
-    document.getElementById('btn-preset-cuboid').addEventListener('click', () => {
-      picker.setAxisRotation(25, 0, -45);
-      picker.setDimensions(1.5, 0.7, 1.0);
-      picker.setRadius(0.06);
-      picker.setColor({ r: 255, g: 255, b: 255 });
-    });
-
-    // Generic slider
+    // ── Generic Blender Slider Component ──
     const makeGenericSlider = (sliderId, inputId, getFn, setFn, minVal, maxVal, unit = '', stepPrecision = 2) => {
       const slider = document.getElementById(sliderId);
       const input = document.getElementById(inputId);
@@ -378,7 +412,50 @@
       };
     };
 
-    // Rotation slider
+    // ── 12 Cube Edges Controls Logic (Front & Back) ──
+    const efVis = document.getElementById('ef-vis');
+    const efDash = document.getElementById('ef-dash');
+    const ebVis = document.getElementById('eb-vis');
+    const ebDash = document.getElementById('eb-dash');
+    const btnToggleFront = document.getElementById('btn-toggle-front');
+    const btnToggleBack = document.getElementById('btn-toggle-back');
+    const btnToggleEdges = document.getElementById('btn-toggle-edges');
+
+    const updateEdgeStyle = () => {
+      if (picker && picker.setEdgeStyle) {
+        picker.setEdgeStyle({
+          showFront: efVis.checked,
+          frontDashed: efDash.checked,
+          showBack: ebVis.checked,
+          backDashed: ebDash.checked,
+        });
+      }
+    };
+
+    [efVis, efDash, ebVis, ebDash].forEach(el => el.addEventListener('input', updateEdgeStyle));
+
+    btnToggleFront.addEventListener('click', () => {
+      efVis.checked = !efVis.checked;
+      updateEdgeStyle();
+    });
+
+    btnToggleBack.addEventListener('click', () => {
+      ebVis.checked = !ebVis.checked;
+      updateEdgeStyle();
+    });
+
+    let allEdgesOn = true;
+    btnToggleEdges.addEventListener('click', () => {
+      allEdgesOn = !allEdgesOn;
+      efVis.checked = allEdgesOn;
+      ebVis.checked = allEdgesOn;
+      updateEdgeStyle();
+    });
+
+    const sEfW = makeGenericSlider('slider-ef-w', 'v-ef-w', () => picker.getEdgeStyle ? picker.getEdgeStyle().frontWidth : 1.5, (w) => { if (picker.setEdgeStyle) picker.setEdgeStyle({ frontWidth: w }); }, 0.5, 8.0, 'px', 1);
+    const sEbW = makeGenericSlider('slider-eb-w', 'v-eb-w', () => picker.getEdgeStyle ? picker.getEdgeStyle().backWidth : 1.0, (w) => { if (picker.setEdgeStyle) picker.setEdgeStyle({ backWidth: w }); }, 0.5, 8.0, 'px', 1);
+
+    // ── Rotation Sliders ──
     const initBlenderSlider = (sliderId, inputId, axis, minVal, maxVal) => {
       const slider = document.getElementById(sliderId);
       const input = document.getElementById(inputId);
@@ -465,6 +542,8 @@
       };
     };
 
+    const sZoom = makeGenericSlider('slider-zoom', 'v-zoom', () => picker.getZoom ? picker.getZoom() : 1.0, (v) => { if (picker.setZoom) picker.setZoom(v); }, 0.2, 2.5, 'x', 2);
+
     const sSizeX = makeGenericSlider('slider-size-x', 'v-size-x', () => picker.getDimensions().sizeX, (v) => {
       const d = picker.getDimensions();
       picker.setDimensions(v, d.sizeY, d.sizeZ);
@@ -482,20 +561,47 @@
 
     const sRadius = makeGenericSlider('slider-radius', 'v-radius', () => picker.getRadius(), (v) => {
       picker.setRadius(v);
-    }, 0.001, 0.25, '', 3);
+    }, 0.001, 0.25, '', 2);
 
     const sX = initBlenderSlider('slider-rot-x', 'v-rot-x', 'x', -180, 180);
     const sY = initBlenderSlider('slider-rot-y', 'v-rot-y', 'y', -180, 180);
     const sZ = initBlenderSlider('slider-rot-z', 'v-rot-z', 'z', -180, 180);
 
+    // Presets
+    document.getElementById('btn-preset-cube').addEventListener('click', () => {
+      picker.setAxisRotation(20, 0, -30);
+      picker.setZoom(1.0);
+      picker.setDimensions(1.0, 1.0, 1.0);
+      picker.setRadius(0.08);
+      picker.setColor({ r: 255, g: 255, b: 255 });
+      picker.toggleAllGuides(true);
+      picker.setEdgeStyle({ showFront: true, frontDashed: false, frontWidth: 1.5, showBack: true, backDashed: true, backWidth: 1.0 });
+      Object.values(guideCheckboxes).forEach(el => el.checked = true);
+      document.getElementById('ef-vis').checked = true;
+      document.getElementById('ef-dash').checked = false;
+      document.getElementById('eb-vis').checked = true;
+      document.getElementById('eb-dash').checked = true;
+    });
+
+    document.getElementById('btn-preset-cuboid').addEventListener('click', () => {
+      picker.setAxisRotation(25, 0, -45);
+      picker.setZoom(1.0);
+      picker.setDimensions(1.5, 0.7, 1.0);
+      picker.setRadius(0.06);
+      picker.setColor({ r: 255, g: 255, b: 255 });
+    });
+
     const updateLoop = () => {
       sX.update();
       sY.update();
       sZ.update();
+      sZoom.update();
       sSizeX.update();
       sSizeY.update();
       sSizeZ.update();
       sRadius.update();
+      sEfW.update();
+      sEbW.update();
       requestAnimationFrame(updateLoop);
     };
     requestAnimationFrame(updateLoop);
