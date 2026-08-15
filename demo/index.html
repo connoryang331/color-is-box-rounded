@@ -132,15 +132,10 @@
 </head>
 <body>
   <div class="panel-info" id="current-card" style="width: 320px;">
-    <h3>Current color & Guides</h3>
+    <h3>Transform & Guides</h3>
     <div class="rows">
-      <div class="row"><span class="label">HEX</span><span class="val" id="v-hex">#ffffff</span></div>
-      <div class="row"><span class="label">RGB</span><span class="val" id="v-rgb">255, 255, 255</span></div>
-      <div class="row"><span class="label">HSV</span><span class="val" id="v-hsv">0.0, 0.0, 100.0</span></div>
-      <div class="row"><span class="label">OKLCH</span><span class="val" id="v-oklch">1.000, 0.000, 0.0</span></div>
-      
       <!-- 3D Rotation Controls -->
-      <div class="row" style="margin-top: 6px; padding-top: 8px; border-top: 1px dashed #e5e7eb;">
+      <div class="row" style="padding-top: 0;">
         <span class="label" style="color: #ef4444;">ROT X</span>
         <div class="blender-slider rot-x" id="slider-rot-x">
           <div class="bar"></div>
@@ -284,7 +279,16 @@
   <div class="center-col">
     <h1>Color Is Box Rounded</h1>
     <div class="panel-holder"><div id="holder"></div></div>
-    <p class="subtitle">Real 3D GPU Bevel & Raymarching RGB Color Picker</p>
+    
+    <!-- Clean Borderless Gray Text Values directly below the 3D Box -->
+    <div style="display: flex; justify-content: center; gap: 24px; margin-top: 14px; font: 12px/1.4 ui-monospace, 'SF Mono', 'Cascadia Code', monospace; color: #6b7280;">
+      <div><span style="font-weight: 600; color: #9ca3af; margin-right: 6px;">HEX</span><span id="v-hex" style="color: #4b5563;">#ffffff</span></div>
+      <div><span style="font-weight: 600; color: #9ca3af; margin-right: 6px;">RGB</span><span id="v-rgb" style="color: #4b5563;">255, 255, 255</span></div>
+      <div><span style="font-weight: 600; color: #9ca3af; margin-right: 6px;">HSV</span><span id="v-hsv" style="color: #4b5563;">0.0, 0.0, 100.0</span></div>
+      <div><span style="font-weight: 600; color: #9ca3af; margin-right: 6px;">OKLCH</span><span id="v-oklch" style="color: #4b5563;">1.000, 0.000, 0.0</span></div>
+    </div>
+
+    <p class="subtitle" style="margin-top: 8px;">Real 3D GPU Bevel & Raymarching RGB Color Picker</p>
   </div>
 
   <div class="panel-info" id="how-card">
