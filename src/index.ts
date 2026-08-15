@@ -64,6 +64,10 @@ export function createRoundedBoxPicker(
   // triangle geometry stays fixed while dragging (the mix is computed against it).
   let isSVDrag = false;
   let svAnchor: Vec3 | null = null;
+  // svMix holds the current color's barycentric weights (a·C + b·white + g·black) relative to the
+  // anchored triangle, so the position marker inside the triangle follows the pointer while
+  // dragging and rests at the final mix position after release.
+  let svMix: { a: number; b: number; g: number } | null = null;
 
   const listeners = new Set<ColorChangeCallback>();
   const rc = initWebGL(container, size);
@@ -72,7 +76,7 @@ export function createRoundedBoxPicker(
   const scheduleRender = () => {
     if (animId !== null) return;      animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix);
     });
   };
 
@@ -273,10 +277,13 @@ export function createRoundedBoxPicker(
         // (priority over surface picking since the triangle overlays the cube)
         isSVDrag = true;
         svAnchor = { ...dotValues };
+        svMix = sv;
         applyTriangleMix(sv);
       } else if (raycastAt(e.clientX, e.clientY)) {
-        // Left Click / Drag on Box surface = Color Pick
+        // Left Click / Drag on Box surface = Color Pick (re-anchors the triangle to the new color)
         isPicking = true;
+        svAnchor = null;
+        svMix = null;
         pickColorAtScreen(e.clientX, e.clientY);
       } else {
         // Left Click / Drag on EMPTY area = Tumble (view orbit)
@@ -297,7 +304,10 @@ export function createRoundedBoxPicker(
   window.addEventListener('mousemove', (e) => {
     if (isSVDrag) {
       const sv = triangleBarycentric(e.clientX, e.clientY);
-      if (sv) applyTriangleMix(sv);
+      if (sv) {
+        svMix = sv;
+        applyTriangleMix(sv);
+      }
     } else if (isTumbling) {
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
@@ -313,7 +323,8 @@ export function createRoundedBoxPicker(
   window.addEventListener('mouseup', () => {
     if (isSVDrag) {
       isSVDrag = false;
-      svAnchor = null;
+      // Keep svAnchor + svMix: the triangle stays anchored to the drag-start color and the marker
+      // rests at the final mix position until the next surface pick re-anchors it.
     }
     if (isTumbling) {
       isTumbling = false;
@@ -403,11 +414,15 @@ export function createRoundedBoxPicker(
     setColor: (c: RGBColor) => {
       color = c;
       dotValues = rgbToValues(c, mode);
+      svAnchor = null;
+      svMix = null;
       notify();
       scheduleRender();
     },
     setMode: (m: ColorMode) => {
       mode = m;
+      svAnchor = null;
+      svMix = null;
       notify();
       scheduleRender();
     },

@@ -226,6 +226,7 @@ export function renderRoundedBox(
   dotValues: Vec3,
   dotVisible: boolean,
   svAnchor: Vec3 | null,
+  svMix: { a: number; b: number; g: number } | null,
 ): void {
   const { gl, overlayCtx, width, height, program, uniforms } = rc;
   const dpr = window.devicePixelRatio || 1;
@@ -328,12 +329,29 @@ export function renderRoundedBox(
       overlayCtx.lineWidth = 1.2;
       overlayCtx.stroke();
 
+      // Position marker: the current color's mix (a·C + b·W + g·K) inside the anchored triangle.
+      // It follows the pointer while dragging and rests at the final position after release.
+      if (svMix) {
+        const mx = svMix.a * tri.c.x + svMix.b * tri.w.x + svMix.g * tri.k.x;
+        const my = svMix.a * tri.c.y + svMix.b * tri.w.y + svMix.g * tri.k.y;
+        overlayCtx.beginPath();
+        overlayCtx.arc(mx, my, 4, 0, Math.PI * 2);
+        overlayCtx.fillStyle = '#ffffff';
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(17, 24, 39, 0.75)';
+        overlayCtx.lineWidth = 1.4;
+        overlayCtx.stroke();
+      }
+
       overlayCtx.restore();
     }
   }
 
   // 2.2 Draw Pick Dot
-  if (dotVisible) {
+  // Skipped while the triangle marker is active: the marker (a·C + b·W + g·K projection) lands
+  // exactly on the pick dot (barycentric coords are preserved by the orthographic projection),
+  // so the marker doubles as the position indicator for the current color.
+  if (dotVisible && !svMix) {
     const dotPos = project3D(dotValues, scale, center, cam, box);
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;

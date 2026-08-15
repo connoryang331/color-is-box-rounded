@@ -13,6 +13,9 @@ Tiny, framework-agnostic, works everywhere.
 - 🎥 **Blender-style viewport** — middle-drag (or drag on empty space) orbits a separate *camera*;
   object rotation values never change while orbiting
 - 🖱 **Pixel-exact picking** — CPU raycast mirrors the GPU shader exactly (same SDF, same matrix inverse)
+- 🔺 **Saturation triangle** — a draggable current-color / white / black triangle overlaid on the cube
+  adjusts saturation & brightness while preserving hue (barycentric mix); a marker dot shows your
+  current position inside the triangle and stays after release (toggle with the SV Triangle guide)
 - ⌨️ **Keyboard** — `R` reset, `F` / `B` / `T` front / back / top views, arrow keys nudge rotation
 - 🎚 **Blender-style numeric sliders** in the demo — drag to scrub, click to type a value, `Shift` drag for fine control
 - 📐 **Center axis guides** (`Cx` / `Cy` / `Cz`) + toggleable front / back edge wireframe
