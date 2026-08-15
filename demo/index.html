@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Is Box Rounded — True 3D Bevel Raymarching Demo</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 40px; margin: 0; background: #f3f4f6; box-sizing: border-box; }
+  .center-col { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  h1 { margin: 0 0 16px; font-size: 18px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #374151; text-align: center; }
+  .subtitle { margin: 14px 0 0; font-size: 12px; font-weight: 400; letter-spacing: .04em; color: #9ca3af; text-align: center; }
+  .panel-holder { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.07); padding: 0; overflow: hidden; }
+  .panel-info { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 20px 24px; box-shadow: 0 6px 20px rgba(0,0,0,.07); width: 320px; min-height: 252px; box-sizing: border-box; display: flex; flex-direction: column; }
+  #current-card { position: fixed; right: 24px; bottom: 24px; }
+  #how-card { position: fixed; left: 24px; bottom: 24px; }
+  h3 { margin: 0 0 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9ca3af; }
+  .rows { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .row { display: flex; align-items: center; padding: 7px 0; }
+  .row .label { font-size: 12px; font-weight: 600; color: #6b7280; letter-spacing: .01em; width: 62px; flex-shrink: 0; }
+  .row .val { font: 12.5px/1.5 ui-monospace, "SF Mono", "Cascadia Code", monospace; color: #111827; letter-spacing: .01em; text-align: left; margin-left: 0; flex: 1; }
+
+  /* Blender-style numeric slider (Light Clean White Theme) */
+  .blender-slider {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 155px;
+    height: 26px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    overflow: hidden;
+    cursor: ew-resize;
+    user-select: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    transition: border-color 0.15s;
+  }
+  .blender-slider:hover {
+    border-color: #9ca3af;
+    background: #fafafa;
+  }
+  .blender-slider .bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    opacity: 0.18;
+    pointer-events: none;
+    transition: width 0.04s linear;
+  }
+  .blender-slider.rot-x .bar { background: #ef4444; opacity: 0.22; }
+  .blender-slider.rot-y .bar { background: #22c55e; opacity: 0.22; }
+  .blender-slider.rot-z .bar { background: #3b82f6; opacity: 0.22; }
+  .blender-slider input {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    text-align: center;
+    font: 12px/26px ui-monospace, "SF Mono", monospace;
+    font-weight: 600;
+    color: #1f2937;
+    cursor: ew-resize;
+    padding: 0 4px;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+  .blender-slider.typing input,
+  .blender-slider input:focus {
+    background: #ffffff;
+    color: #111827;
+    cursor: text;
+    border: 1px solid #3b82f6;
+    pointer-events: auto;
+  }
+
+  .guides-panel {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .guide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .guide-header span {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #6b7280;
+  }
+  .btn-all-group { display: flex; gap: 4px; }
+  .btn-mini {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    cursor: pointer;
+    color: #374151;
+    transition: all 0.15s;
+  }
+  .btn-mini:hover { background: #e5e7eb; color: #111827; }
+  .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .guide-toggle-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #4b5563;
+    cursor: pointer;
+    user-select: none;
+  }
+  .guide-toggle-item input[type="checkbox"] { accent-color: #007AFF; cursor: pointer; margin: 0; }
+  .guide-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .guide-dot.red { background: #ef4444; }
+  .guide-dot.green { background: #22c55e; }
+  .guide-dot.blue { background: #3b82f6; }
+</style>
+</head>
+<body>
+  <div class="panel-info" id="current-card" style="width: 320px;">
+    <h3>Rounded Bevel 3D Box</h3>
+    <div class="rows">
+      <div class="row"><span class="label">HEX</span><span class="val" id="v-hex">#ffffff</span></div>
+      <div class="row"><span class="label">RGB</span><span class="val" id="v-rgb">255, 255, 255</span></div>
+      <div class="row"><span class="label">HSV</span><span class="val" id="v-hsv">0.0, 0.0, 100.0</span></div>
+      <div class="row"><span class="label">OKLCH</span><span class="val" id="v-oklch">1.000, 0.000, 0.0</span></div>
+      
+      <!-- 3D Rotation Controls -->
+      <div class="row" style="margin-top: 6px; padding-top: 8px; border-top: 1px dashed #e5e7eb;">
+        <span class="label" style="color: #ef4444;">ROT X</span>
+        <div class="blender-slider rot-x" id="slider-rot-x">
+          <div class="bar"></div>
+          <input type="text" id="v-rot-x" value="20.0°">
+        </div>
+      </div>
+      <div class="row">
+        <span class="label" style="color: #22c55e;">ROT Y</span>
+        <div class="blender-slider rot-y" id="slider-rot-y">
+          <div class="bar"></div>
+          <input type="text" id="v-rot-y" value="0.0°">
+        </div>
+      </div>
+      <div class="row">
+        <span class="label" style="color: #3b82f6;">ROT Z</span>
+        <div class="blender-slider rot-z" id="slider-rot-z">
+          <div class="bar"></div>
+          <input type="text" id="v-rot-z" value="-30.0°">
+        </div>
+      </div>
+
+      <!-- 3D Box Dimensions (长方体与倒角控制) -->
+      <div class="row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e5e7eb;">
+        <span class="label" style="color: #ef4444;">SIZE X</span>
+        <div class="blender-slider rot-x" id="slider-size-x">
+          <div class="bar"></div>
+          <input type="text" id="v-size-x" value="1.00">
+        </div>
+      </div>
+      <div class="row">
+        <span class="label" style="color: #22c55e;">SIZE Y</span>
+        <div class="blender-slider rot-y" id="slider-size-y">
+          <div class="bar"></div>
+          <input type="text" id="v-size-y" value="1.00">
+        </div>
+      </div>
+      <div class="row">
+        <span class="label" style="color: #3b82f6;">SIZE Z</span>
+        <div class="blender-slider rot-z" id="slider-size-z">
+          <div class="bar"></div>
+          <input type="text" id="v-size-z" value="1.00">
+        </div>
+      </div>
+      <div class="row">
+        <span class="label" style="color: #d97706;">RADIUS</span>
+        <div class="blender-slider" id="slider-radius">
+          <div class="bar" style="background: #d97706; opacity: 0.22;"></div>
+          <input type="text" id="v-radius" value="0.08">
+        </div>
+      </div>
+
+      <!-- Quick Preset Icon Buttons (Cube / Cuboid) -->
+      <div style="margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button id="btn-preset-cube" class="btn-mini" style="height: 30px; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          Cube
+        </button>
+        <button id="btn-preset-cuboid" class="btn-mini" style="height: 30px; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+          <svg viewBox="0 0 24 24" width="16" height="15" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 14.5V9.5a1.5 1.5 0 0 0-.75-1.3l-9-4.2a1.5 1.5 0 0 0-1.5 0l-9 4.2A1.5 1.5 0 0 0 1 9.5v5a1.5 1.5 0 0 0 .75 1.3l9 4.2a1.5 1.5 0 0 0 1.5 0l9-4.2a1.5 1.5 0 0 0 .75-1.3z"/>
+            <polyline points="1.5 9 11.5 13.5 21.5 9"/>
+            <line x1="11.5" y1="20" x2="11.5" y2="13.5"/>
+          </svg>
+          Cuboid
+        </button>
+      </div>
+
+      <!-- Individual Guide Switches & Master Buttons -->
+      <div class="guides-panel">
+        <div class="guide-header">
+          <span>Guide Lines</span>
+          <div class="btn-all-group">
+            <button class="btn-mini" id="btn-show-all">Show All</button>
+            <button class="btn-mini" id="btn-hide-all">Hide All</button>
+          </div>
+        </div>
+        <div class="guide-grid">
+          <label class="guide-toggle-item"><input type="checkbox" id="g-vx" checked><span class="guide-dot red"></span> Vertex X</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="g-cx" checked><span class="guide-dot red"></span> Center X</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="g-vy" checked><span class="guide-dot green"></span> Vertex Y</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="g-cy" checked><span class="guide-dot green"></span> Center Y</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="g-vz" checked><span class="guide-dot blue"></span> Vertex Z</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="g-cz" checked><span class="guide-dot blue"></span> Center Z</label>
+          <label class="guide-toggle-item" style="grid-column: span 2;"><input type="checkbox" id="g-angles" checked>📐 Yaw & Pitch Angles</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="center-col">
+    <h1>Color Is Box Rounded</h1>
+    <div class="panel-holder"><div id="holder"></div></div>
+    <p class="subtitle">Real 3D GPU Bevel & Raymarching RGB Color Picker</p>
+  </div>
+
+  <div class="panel-info" id="how-card">
+    <h3>True 3D Bevel Architecture</h3>
+    <ul class="tips" style="padding-left: 16px; margin: 0; font-size: 11px; line-height: 1.6; color: #4b5563;">
+      <li><b>GPU Raymarching Shader</b>: SDF <code>sdRoundBox</code> 物理级真实倒角曲面</li>
+      <li><b>Zero Mesh Seams</b>: 8 个球角与 12 根圆柱棱边无缝闭合，绝无漏光与空白</li>
+      <li><b>RGB Continuous Interpolation</b>: 倒角圆弧处色彩平滑连续三维插值</li>
+      <li><b>Ultra Fast & Lightweight</b>: 零外部依赖，极速 60FPS 渲染</li>
+    </ul>
+  </div>
+
+  <script src="../dist/color-is-box-rounded.iife.js"></script>
+  <script>
+    const holder = document.getElementById('holder');
+    const picker = ColorIsBoxRounded.createRoundedBoxPicker(holder, { initialColor: { r: 255, g: 255, b: 255 }, size: 460 });
+    const show = (c) => {
+      document.getElementById('v-hex').textContent = c.hex;
+      document.getElementById('v-rgb').textContent = c.rgb.r + ', ' + c.rgb.g + ', ' + c.rgb.b;
+      document.getElementById('v-hsv').textContent = c.hsb.h.toFixed(1) + ', ' + c.hsb.s.toFixed(1) + ', ' + c.hsb.b.toFixed(1);
+      document.getElementById('v-oklch').textContent = c.oklch.l.toFixed(3) + ', ' + c.oklch.c.toFixed(3) + ', ' + c.oklch.h.toFixed(1);
+    };
+    picker.on('change', show);
+    show(picker.getColor());
+
+    // Guide switches
+    const guideCheckboxes = {
+      vertexX: document.getElementById('g-vx'),
+      vertexY: document.getElementById('g-vy'),
+      vertexZ: document.getElementById('g-vz'),
+      centerX: document.getElementById('g-cx'),
+      centerY: document.getElementById('g-cy'),
+      centerZ: document.getElementById('g-cz'),
+      angleGuides: document.getElementById('g-angles'),
+    };
+
+    Object.entries(guideCheckboxes).forEach(([key, el]) => {
+      el.addEventListener('change', () => {
+        picker.setGuides({ [key]: el.checked });
+      });
+    });
+
+    document.getElementById('btn-show-all').addEventListener('click', () => {
+      Object.values(guideCheckboxes).forEach(el => el.checked = true);
+      picker.toggleAllGuides(true);
+    });
+
+    document.getElementById('btn-hide-all').addEventListener('click', () => {
+      Object.values(guideCheckboxes).forEach(el => el.checked = false);
+      picker.toggleAllGuides(false);
+    });
+
+    // Presets
+    document.getElementById('btn-preset-cube').addEventListener('click', () => {
+      picker.setAxisRotation(20, 0, -30);
+      picker.setDimensions(1.0, 1.0, 1.0);
+      picker.setRadius(0.08);
+      picker.setColor({ r: 255, g: 255, b: 255 });
+    });
+
+    document.getElementById('btn-preset-cuboid').addEventListener('click', () => {
+      picker.setAxisRotation(25, 0, -45);
+      picker.setDimensions(1.5, 0.7, 1.0);
+      picker.setRadius(0.06);
+      picker.setColor({ r: 255, g: 255, b: 255 });
+    });
+
+    // Generic slider
+    const makeGenericSlider = (sliderId, inputId, getFn, setFn, minVal, maxVal, unit = '', stepPrecision = 2) => {
+      const slider = document.getElementById(sliderId);
+      const input = document.getElementById(inputId);
+      const bar = slider.querySelector('.bar');
+      let isDragging = false;
+      let startX = 0;
+      let startVal = 0;
+      let hasMoved = false;
+
+      const updateBar = (val) => {
+        const norm = Math.max(0, Math.min(1, (val - minVal) / (maxVal - minVal)));
+        bar.style.width = (norm * 100) + '%';
+      };
+
+      slider.addEventListener('mousedown', (e) => {
+        if (slider.classList.contains('typing')) return;
+        isDragging = true;
+        hasMoved = false;
+        startX = e.clientX;
+        startVal = getFn();
+        document.body.style.cursor = 'ew-resize';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        if (Math.abs(dx) > 0) {
+          hasMoved = true;
+          const speed = e.shiftKey ? 0.002 : 0.008;
+          const newVal = Math.max(minVal, Math.min(maxVal, parseFloat((startVal + dx * speed).toFixed(stepPrecision))));
+          setFn(newVal);
+          input.value = newVal.toFixed(stepPrecision) + unit;
+          updateBar(newVal);
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          document.body.style.cursor = 'default';
+          if (!hasMoved && !slider.classList.contains('typing')) {
+            slider.classList.add('typing');
+            input.value = getFn().toFixed(stepPrecision);
+            input.focus();
+            input.select();
+          }
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        slider.classList.remove('typing');
+        const v = Math.max(minVal, Math.min(maxVal, parseFloat(input.value) || minVal));
+        setFn(v);
+        input.value = v.toFixed(stepPrecision) + unit;
+        updateBar(v);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') input.blur();
+      });
+
+      return {
+        update: () => {
+          if (!slider.classList.contains('typing') && !isDragging) {
+            const v = getFn();
+            input.value = v.toFixed(stepPrecision) + unit;
+            updateBar(v);
+          }
+        }
+      };
+    };
+
+    // Rotation slider
+    const initBlenderSlider = (sliderId, inputId, axis, minVal, maxVal) => {
+      const slider = document.getElementById(sliderId);
+      const input = document.getElementById(inputId);
+      const bar = slider.querySelector('.bar');
+      let isDragging = false;
+      let startX = 0;
+      let startVal = 0;
+      let hasMoved = false;
+
+      const getVal = () => {
+        const rot = picker.getAxisRotation();
+        return axis === 'x' ? rot.rotXDeg : axis === 'y' ? rot.rotYDeg : rot.rotZDeg;
+      };
+
+      const setVal = (val) => {
+        const rot = picker.getAxisRotation();
+        const rx = axis === 'x' ? val : rot.rotXDeg;
+        const ry = axis === 'y' ? val : rot.rotYDeg;
+        const rz = axis === 'z' ? val : rot.rotZDeg;
+        picker.setAxisRotation(rx, ry, rz);
+      };
+
+      const updateBar = (val) => {
+        const norm = Math.max(0, Math.min(1, (val - minVal) / (maxVal - minVal)));
+        bar.style.width = (norm * 100) + '%';
+      };
+
+      slider.addEventListener('mousedown', (e) => {
+        if (slider.classList.contains('typing')) return;
+        isDragging = true;
+        hasMoved = false;
+        startX = e.clientX;
+        startVal = getVal();
+        document.body.style.cursor = 'ew-resize';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        if (Math.abs(dx) > 0) {
+          hasMoved = true;
+          const speed = e.shiftKey ? 0.1 : 0.6;
+          const newVal = Math.round((startVal + dx * speed) * 10) / 10;
+          setVal(newVal);
+          input.value = newVal.toFixed(1) + '°';
+          updateBar(newVal);
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          document.body.style.cursor = 'default';
+          if (!hasMoved && !slider.classList.contains('typing')) {
+            slider.classList.add('typing');
+            input.value = getVal().toFixed(1);
+            input.focus();
+            input.select();
+          }
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        slider.classList.remove('typing');
+        const v = parseFloat(input.value) || 0;
+        setVal(v);
+        input.value = v.toFixed(1) + '°';
+        updateBar(v);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') input.blur();
+      });
+
+      return {
+        update: () => {
+          if (!slider.classList.contains('typing') && !isDragging) {
+            const v = getVal();
+            input.value = v.toFixed(1) + '°';
+            updateBar(v);
+          }
+        }
+      };
+    };
+
+    const sSizeX = makeGenericSlider('slider-size-x', 'v-size-x', () => picker.getDimensions().sizeX, (v) => {
+      const d = picker.getDimensions();
+      picker.setDimensions(v, d.sizeY, d.sizeZ);
+    }, 0.2, 2.5, '', 2);
+
+    const sSizeY = makeGenericSlider('slider-size-y', 'v-size-y', () => picker.getDimensions().sizeY, (v) => {
+      const d = picker.getDimensions();
+      picker.setDimensions(d.sizeX, v, d.sizeZ);
+    }, 0.2, 2.5, '', 2);
+
+    const sSizeZ = makeGenericSlider('slider-size-z', 'v-size-z', () => picker.getDimensions().sizeZ, (v) => {
+      const d = picker.getDimensions();
+      picker.setDimensions(d.sizeX, d.sizeY, v);
+    }, 0.2, 2.5, '', 2);
+
+    const sRadius = makeGenericSlider('slider-radius', 'v-radius', () => picker.getRadius(), (v) => {
+      picker.setRadius(v);
+    }, 0.001, 0.25, '', 3);
+
+    const sX = initBlenderSlider('slider-rot-x', 'v-rot-x', 'x', -180, 180);
+    const sY = initBlenderSlider('slider-rot-y', 'v-rot-y', 'y', -180, 180);
+    const sZ = initBlenderSlider('slider-rot-z', 'v-rot-z', 'z', -180, 180);
+
+    const updateLoop = () => {
+      sX.update();
+      sY.update();
+      sZ.update();
+      sSizeX.update();
+      sSizeY.update();
+      sSizeZ.update();
+      sRadius.update();
+      requestAnimationFrame(updateLoop);
+    };
+    requestAnimationFrame(updateLoop);
+  </script>
+</body>
+</html>

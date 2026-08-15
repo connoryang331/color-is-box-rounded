@@ -1,0 +1,34 @@
+{
+  "name": "color-is-box-rounded",
+  "version": "1.0.0",
+  "description": "Ultra-fast zero-dependency 3D Rounded Bevel Box RGB/HSV/OKLCH color picker (SDF Raymarching & Smooth Mesh)",
+  "type": "module",
+  "main": "dist/color-is-box-rounded.js",
+  "module": "dist/color-is-box-rounded.js",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./dist/color-is-box-rounded.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "color-picker",
+    "3d",
+    "bevel",
+    "rounded-cube",
+    "zero-dependency",
+    "webgl",
+    "raymarching"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node -e \"import('http').then(({createServer}) => import('fs').then(({readFileSync, existsSync}) => import('path').then(({join, extname}) => createServer((req, res) => { const p = req.url === '/' ? '/demo/index.html' : req.url; const f = join(process.cwd(), p); if (!existsSync(f)) { res.writeHead(404); return res.end('Not Found'); } const m = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' }; res.writeHead(200, { 'Content-Type': m[extname(f)] || 'application/octet-stream' }); res.end(readFileSync(f)); }).listen(3001, () => console.log('Server running: http://localhost:3001/demo/index.html')))))\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}
