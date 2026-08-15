@@ -13,11 +13,12 @@ Tiny, framework-agnostic, works everywhere.
 - 🎥 **Blender-style viewport** — middle-drag (or drag on empty space) orbits a separate *camera*;
   object rotation values never change while orbiting
 - 🖱 **Pixel-exact picking** — CPU raycast mirrors the GPU shader exactly (same SDF, same matrix inverse)
-- 🔺 **Saturation triangle** — hold **Ctrl / ⌘** to reveal a current-color / white / black triangle
+- 🔺 **Saturation triangle** — hold **Shift** to reveal a current-color / white / black triangle
   overlaid on the cube; dragging inside it adjusts saturation & brightness while preserving hue
-  (barycentric mix, exact GPU gradient). A marker dot shows your current position; release Ctrl to
+  (barycentric mix, exact GPU gradient). A marker dot shows your current position; release Shift to
   hide it again. Left-click always picks from the cube — no modifier, no accidental tuning.
   Degenerate colors (gray / white / black) still show the W–K gray axis. (Toggle with SV Triangle guide)
+  Shift is used because Alt is the orbit modifier and Ctrl / ⌘ stays free for multi-select
 - ⌨️ **Keyboard** — `R` reset, `F` / `B` / `T` front / back / top views, arrow keys nudge rotation
 - 🎚 **Blender-style numeric sliders** in the demo — drag to scrub, click to type a value, `Shift` drag for fine control
 - 📐 **Center axis guides** (`Cx` / `Cy` / `Cz`) + toggleable front / back edge wireframe
@@ -115,10 +116,10 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | `R` | reset view |
 | `F` / `B` / `T` | front / back / top view (camera only — object values unchanged) |
 | `←` `→` / `↑` `↓` | nudge ROT Y / ROT X by 5° |
-| Hold `Ctrl` / `⌘` | reveal the saturation triangle (hidden by default) — it unfolds from the current color point |
-| Release `Ctrl` / `⌘` | the triangle folds back into the current color point |
-| `Ctrl` / `⌘` + drag inside triangle | adjust saturation & brightness (hue preserved); marker dot shows the current position; release `Ctrl` to hide |
-| `Ctrl` / `⌘` with a gray / white / black color | triangle degenerates — the W–K gray axis is drawn instead |
+| Hold `Shift` | reveal the saturation triangle (hidden by default) — it unfolds from the current color point |
+| Release `Shift` | the triangle folds back into the current color point |
+| `Shift` + drag inside triangle | adjust saturation & brightness (hue preserved); marker dot shows the current position |
+| `Shift` with a gray / white / black color | triangle degenerates — the W–K gray axis is drawn instead |
 
 Rotation model: all rotations pivot around the box's own local axes. `objMat` holds the object
 orientation (driven by sliders / presets) and `viewMat` holds the camera orientation (driven by

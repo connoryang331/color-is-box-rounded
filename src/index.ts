@@ -68,10 +68,12 @@ export function createRoundedBoxPicker(
   // anchored triangle, so the position marker inside the triangle follows the pointer while
   // dragging and rests at the final mix position after release.
   let svMix: { a: number; b: number; g: number } | null = null;
-  // The saturation triangle is revealed on demand: hold Ctrl / Cmd to show and use it.
+  // The saturation triangle is revealed on demand: hold Shift to show and use it.
   // Without the modifier, left-click always picks from the cube surface (no accidental tuning).
-  let isCtrlHeld = false;
-  // Reveal animation: svReveal goes 0 -> 1 while Ctrl is held (triangle unfolds from the current
+  // Ctrl / Cmd stays free for future multi-select (e.g. building a gradient), and Alt is already
+  // the viewport-orbit modifier — Shift is the free, conflict-free choice.
+  let isShiftHeld = false;
+  // Reveal animation: svReveal goes 0 -> 1 while Shift is held (triangle unfolds from the current
   // color point) and 1 -> 0 on release (folds back). Driven by a self-scheduling rAF loop.
   let svReveal = 0;
   let svRevealTarget = 0;
@@ -104,7 +106,7 @@ export function createRoundedBoxPicker(
   const scheduleRender = () => {
     if (animId !== null) return;      animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isCtrlHeld, svReveal);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal);
     });
   };
 
@@ -299,8 +301,8 @@ export function createRoundedBoxPicker(
       document.body.style.cursor = 'grabbing';
       e.preventDefault();
     } else if (e.button === 0) {
-      // Triangle interactions only while Ctrl / Cmd is held (it is the reveal modifier)
-      const sv = isCtrlHeld ? triangleBarycentric(e.clientX, e.clientY) : null;
+      // Triangle interactions only while Shift is held (it is the reveal modifier)
+      const sv = isShiftHeld ? triangleBarycentric(e.clientX, e.clientY) : null;
       if (sv) {
         // Left Click / Drag INSIDE the saturation triangle = adjust saturation & brightness
         // (priority over surface picking since the triangle overlays the cube)
@@ -386,10 +388,10 @@ export function createRoundedBoxPicker(
 
   // Keyboard shortcuts: R reset · F front · B back · T top · Arrow keys nudge rotation
   const onKeyDown = (e: KeyboardEvent) => {
-    // Ctrl / Cmd reveals the saturation triangle (works even while typing values)
-    if (e.key === 'Control' || e.key === 'Meta') {
-      if (!isCtrlHeld) {
-        isCtrlHeld = true;
+    // Shift reveals the saturation triangle (works even while typing values)
+    if (e.key === 'Shift') {
+      if (!isShiftHeld) {
+        isShiftHeld = true;
         svAnchor = null;
         svMix = null;
         animateReveal(1);
@@ -434,10 +436,10 @@ export function createRoundedBoxPicker(
     }
   };
   window.addEventListener('keydown', onKeyDown);
-  // Releasing Ctrl / Cmd hides the triangle again (fresh anchor on next reveal)
+  // Releasing Shift hides the triangle again (fresh anchor on next reveal)
   const onKeyUp = (e: KeyboardEvent) => {
-    if ((e.key === 'Control' || e.key === 'Meta') && isCtrlHeld) {
-      isCtrlHeld = false;
+    if (e.key === 'Shift' && isShiftHeld) {
+      isShiftHeld = false;
       // Keep svAnchor/svMix: the triangle folds back together with its marker (renderer keeps
       // drawing while svReveal > 0). The next reveal resets the anchor to the current color.
       animateReveal(0);
@@ -446,8 +448,8 @@ export function createRoundedBoxPicker(
   window.addEventListener('keyup', onKeyUp);
   // Safety: if the window loses focus while Ctrl is held, drop the reveal state
   const onWindowBlur = () => {
-    if (isCtrlHeld) {
-      isCtrlHeld = false;
+    if (isShiftHeld) {
+      isShiftHeld = false;
       animateReveal(0);
     }
   };
