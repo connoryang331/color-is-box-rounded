@@ -68,6 +68,9 @@ export function createRoundedBoxPicker(
   // anchored triangle, so the position marker inside the triangle follows the pointer while
   // dragging and rests at the final mix position after release.
   let svMix: { a: number; b: number; g: number } | null = null;
+  // The saturation triangle is revealed on demand: hold Ctrl / Cmd to show and use it.
+  // Without the modifier, left-click always picks from the cube surface (no accidental tuning).
+  let isCtrlHeld = false;
 
   const listeners = new Set<ColorChangeCallback>();
   const rc = initWebGL(container, size);
@@ -76,7 +79,7 @@ export function createRoundedBoxPicker(
   const scheduleRender = () => {
     if (animId !== null) return;      animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isCtrlHeld);
     });
   };
 
@@ -271,7 +274,8 @@ export function createRoundedBoxPicker(
       document.body.style.cursor = 'grabbing';
       e.preventDefault();
     } else if (e.button === 0) {
-      const sv = triangleBarycentric(e.clientX, e.clientY);
+      // Triangle interactions only while Ctrl / Cmd is held (it is the reveal modifier)
+      const sv = isCtrlHeld ? triangleBarycentric(e.clientX, e.clientY) : null;
       if (sv) {
         // Left Click / Drag INSIDE the saturation triangle = adjust saturation & brightness
         // (priority over surface picking since the triangle overlays the cube)
@@ -357,6 +361,16 @@ export function createRoundedBoxPicker(
 
   // Keyboard shortcuts: R reset · F front · B back · T top · Arrow keys nudge rotation
   const onKeyDown = (e: KeyboardEvent) => {
+    // Ctrl / Cmd reveals the saturation triangle (works even while typing values)
+    if (e.key === 'Control' || e.key === 'Meta') {
+      if (!isCtrlHeld) {
+        isCtrlHeld = true;
+        svAnchor = null;
+        svMix = null;
+        scheduleRender();
+      }
+      return;
+    }
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return; // do not intercept while typing values
     switch (e.key) {
@@ -395,6 +409,26 @@ export function createRoundedBoxPicker(
     }
   };
   window.addEventListener('keydown', onKeyDown);
+  // Releasing Ctrl / Cmd hides the triangle again (fresh anchor on next reveal)
+  const onKeyUp = (e: KeyboardEvent) => {
+    if ((e.key === 'Control' || e.key === 'Meta') && isCtrlHeld) {
+      isCtrlHeld = false;
+      svAnchor = null;
+      svMix = null;
+      scheduleRender();
+    }
+  };
+  window.addEventListener('keyup', onKeyUp);
+  // Safety: if the window loses focus while Ctrl is held, drop the reveal state
+  const onWindowBlur = () => {
+    if (isCtrlHeld) {
+      isCtrlHeld = false;
+      svAnchor = null;
+      svMix = null;
+      scheduleRender();
+    }
+  };
+  window.addEventListener('blur', onWindowBlur);
 
   scheduleRender();
   notify();
@@ -510,6 +544,8 @@ export function createRoundedBoxPicker(
     destroy: () => {
       if (animId !== null) cancelAnimationFrame(animId);
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onWindowBlur);
       container.innerHTML = '';
     },
   };

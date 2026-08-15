@@ -254,6 +254,7 @@ export function renderRoundedBox(
   dotVisible: boolean,
   svAnchor: Vec3 | null,
   svMix: { a: number; b: number; g: number } | null,
+  svShow: boolean,
 ): void {
   const { gl, overlayCtx, width, height, program, uniforms } = rc;
   const dpr = window.devicePixelRatio || 1;
@@ -299,15 +300,19 @@ export function renderRoundedBox(
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // Projected saturation triangle (shared by the GL gradient fill and the 2D overlay)
+  // Projected saturation triangle (shared by the GL gradient fill and the 2D overlay).
+  // Revealed on demand: guides.svTriangle is the feature switch, svShow is the Ctrl / Cmd modifier.
   const scale = width * 0.36;
   const center: Vec2 = { x: width * 0.5, y: height * 0.5 };
   let svTri: SaturationTriangle | null = null;
-  if (guides.svTriangle) {
+  let svAxis: SaturationTriangle | null = null; // degenerate (gray/white/black): just the W–K gray axis
+  if (guides.svTriangle && svShow) {
     const tri = projectSaturationTriangle(svAnchor || dotValues, mode, scale, center, cam, box);
-    // Skip degenerate triangles (gray / white / black current color → C lies on the W–K edge)
+    // Degenerate triangles (gray / white / black current color → C lies on the W–K edge) collapse
+    // to the W–K gray axis, which we still draw so the axis stays discoverable.
     const area = Math.abs((tri.w.x - tri.c.x) * (tri.k.y - tri.c.y) - (tri.w.y - tri.c.y) * (tri.k.x - tri.c.x));
     if (area > 4) svTri = tri;
+    else svAxis = tri;
   }
 
   // 1.5 Saturation Triangle Gradient Fill (exact Gouraud shading on the GPU):
@@ -359,6 +364,20 @@ export function renderRoundedBox(
   // 2.2b Saturation Triangle overlay — edges, vertex markers & position marker on top of the
   // GL gradient fill. The fill itself is GPU Gouraud-shaded (see 1.5); here we only outline the
   // triangle and mark its vertices so it reads as an interactive picker surface.
+  // Degenerate colors (gray / white / black) fall back to the W–K gray axis line.
+  if (svAxis) {
+    const tri = svAxis;
+    overlayCtx.save();
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(tri.k.x, tri.k.y);
+    overlayCtx.lineTo(tri.w.x, tri.w.y);
+    overlayCtx.strokeStyle = 'rgba(107, 114, 128, 0.7)';
+    overlayCtx.lineWidth = 1.2;
+    overlayCtx.setLineDash([5, 4]);
+    overlayCtx.stroke();
+    overlayCtx.setLineDash([]);
+    overlayCtx.restore();
+  }
   if (svTri) {
     const tri = svTri;
     const cr = Math.round(tri.cRGB.x * 255);
