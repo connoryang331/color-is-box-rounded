@@ -13,12 +13,16 @@ Tiny, framework-agnostic, works everywhere.
 - 🎥 **Blender-style viewport** — middle-drag (or drag on empty space) orbits a separate *camera*;
   object rotation values never change while orbiting
 - 🖱 **Pixel-exact picking** — CPU raycast mirrors the GPU shader exactly (same SDF, same matrix inverse)
-- 🔺 **Saturation triangle** — hold **Shift** to reveal a current-color / white / black triangle
-  overlaid on the cube; dragging inside it adjusts saturation & brightness while preserving hue
-  (barycentric mix, exact GPU gradient). A marker dot shows your current position; release Shift to
-  hide it again. Left-click always picks from the cube — no modifier, no accidental tuning.
-  Degenerate colors (gray / white / black) still show the W–K gray axis. (Toggle with SV Triangle guide)
-  Shift is used because Alt is the orbit modifier and Ctrl / ⌘ stays free for multi-select
+- 🎯 **Pick dot rings** — press & hold the picker dot: two rings unfold around it — **outer =
+  saturation** (HSV S, hue + lightness kept), **inner = alpha**. Rotate the pointer around the dot to
+  set the value; pointer distance picks the active ring (switchable mid-drag); release folds them
+  back. Semi-transparent colors show a checkerboard under the dot and an 8-digit `#RRGGBBAA` hex
+- 🔺 **Saturation triangle** (optional, off by default — SV Triangle toggle): hold **Shift** to reveal
+  a current-color / white / black triangle overlaid on the cube; dragging inside it adjusts
+  saturation & brightness while preserving hue (barycentric mix, exact GPU gradient). A marker dot
+  shows your current position; release Shift to hide it again. Degenerate colors (gray / white /
+  black) still show the W–K gray axis. Shift is used because Alt is the orbit modifier and Ctrl /
+  ⌘ stays free for multi-select
 - ⌨️ **Keyboard** — `R` reset, `F` / `B` / `T` front / back / top views, arrow keys nudge rotation
 - 🎚 **Blender-style numeric sliders** in the demo — drag to scrub, click to type a value, `Shift` drag for fine control
 - 📐 **Center axis guides** (`Cx` / `Cy` / `Cz`) + toggleable front / back edge wireframe
@@ -83,6 +87,7 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | `setZoom(z)` / `getZoom()` | zoom (0.1 – 3.0) |
 | `setDimensions(x, y, z)` / `getDimensions()` | box size per axis (0.2 – 2.5) |
 | `setRadius(r)` / `getRadius()` | bevel radius (0.0 – 0.5) |
+| `setAlpha(a)` / `getAlpha()` | picked color transparency 0–1 (drives the inner ring, 8-digit hex) |
 | `setEdgeStyle(partial)` / `getEdgeStyle()` | front/back edge style (see below) |
 | `setGuides(partial)` / `getGuides()` / `toggleAllGuides(visible?)` | guide visibility |
 | `on('change', cb)` / `off('change', cb)` | subscribe / unsubscribe |
@@ -108,6 +113,7 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | Gesture | Action |
 | --- | --- |
 | Left click / drag on box | pick color & move the picker dot |
+| **Press & hold the pick dot** | two rings unfold — outer = saturation, inner = alpha; rotate around the dot to set, release to fold |
 | Left drag on **empty area** | orbit the viewport (grab cursor) |
 | Middle drag / Alt + Left drag | free 360° viewport orbit (Blender style) |
 | Mouse wheel | smooth zoom (0.2× – 2.5×) |
@@ -116,7 +122,7 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | `R` | reset view |
 | `F` / `B` / `T` | front / back / top view (camera only — object values unchanged) |
 | `←` `→` / `↑` `↓` | nudge ROT Y / ROT X by 5° |
-| Hold `Shift` | reveal the saturation triangle (hidden by default) — it unfolds from the current color point |
+| Hold `Shift` (SV Triangle toggle on) | reveal the saturation triangle — it unfolds from the current color point |
 | Release `Shift` | the triangle folds back into the current color point |
 | `Shift` + drag inside triangle | adjust saturation & brightness (hue preserved); marker dot shows the current position |
 | `Shift` with a gray / white / black color | triangle degenerates — the W–K gray axis is drawn instead |

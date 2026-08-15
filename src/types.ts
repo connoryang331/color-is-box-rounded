@@ -131,6 +131,8 @@ export interface RoundedBoxColorPicker {
   getDimensions(): { sizeX: number; sizeY: number; sizeZ: number };
   setRadius(r: number): void;
   getRadius(): number;
+  setAlpha(a: number): void;
+  getAlpha(): number;
   getEdgeStyle(): EdgeStyleConfig;
   setEdgeStyle(style: Partial<EdgeStyleConfig>): void;
   getGuides(): GuideVisibility;

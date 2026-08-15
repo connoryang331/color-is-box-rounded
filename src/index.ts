@@ -1,11 +1,11 @@
 import type {
-  RGBColor, ColorMode, Vec3,
+  RGBColor, ColorMode, Vec2, Vec3,
   ColorOutput, ColorChangeCallback, GuideVisibility, EdgeStyleConfig, RoundedBoxColorPicker,
 } from './types';
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
-import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, projectSaturationTriangle } from './camera-math';
-import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb } from './color-math';
-import { initWebGL, renderRoundedBox } from './rounded-renderer';
+import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle } from './camera-math';
+import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, hsbToRgb } from './color-math';
+import { initWebGL, renderRoundedBox, RING_INNER_R, RING_OUTER_R } from './rounded-renderer';
 
 export interface RoundedBoxOptions {
   initialColor?: RGBColor;
@@ -30,6 +30,16 @@ const wrapRad = (r: number): number => {
   if (m > Math.PI) m -= TWO_PI;
   else if (m < -Math.PI) m += TWO_PI;
   return m;
+};
+
+/** Ease-in-out quadratic (used by the reveal animations). */
+const easeInOutQuad = (t: number): number =>
+  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+/** 8-digit #RRGGBBAA hex for a color with transparency. */
+const alphaHex = (rgb: RGBColor, a: number): string => {
+  const toHex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}${toHex(a * 255)}`;
 };
 
 export function createRoundedBoxPicker(
@@ -60,6 +70,8 @@ export function createRoundedBoxPicker(
 
   let color: RGBColor = options.initialColor || { r: 255, g: 255, b: 255 };
   let dotValues: Vec3 = rgbToValues(color, mode);
+  // Alpha (0..1) of the picked color — driven by the inner ring (or the setAlpha API).
+  let alpha = 1.0;
   // Saturation triangle drag state: svAnchor is the color captured at drag start so the
   // triangle geometry stays fixed while dragging (the mix is computed against it).
   let isSVDrag = false;
@@ -99,6 +111,39 @@ export function createRoundedBoxPicker(
     svAnimFrame = requestAnimationFrame(step);
   };
 
+  // ── Alpha / Saturation rings (press & hold the pick dot) ──
+  // Pressing the pick dot reveals two concentric rings around it:
+  //   outer ring = saturation (HSV S, hue + lightness kept)
+  //   inner ring = alpha
+  // The pointer's radial band selects the active ring (switchable mid-drag); rotating
+  // around the anchor sets the value 0–100%. Release folds the rings back.
+  let isRingDrag = false;
+  let ringAnchor: Vec2 | null = null;      // screen-space ring center (dot position at press)
+  let ringBand: 'sat' | 'alpha' | null = null;
+  let ringReveal = 0;
+  let ringRevealTarget = 0;
+  let ringAnimFrame: number | null = null;
+  const animateRing = (target: number) => {
+    ringRevealTarget = target;
+    if (ringAnimFrame !== null) return; // already animating toward the latest target
+    let last = performance.now();
+    const speed = 6.0; // full transition in ~165 ms
+    const step = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (ringRevealTarget > ringReveal) ringReveal = Math.min(ringRevealTarget, ringReveal + dt * speed);
+      else ringReveal = Math.max(ringRevealTarget, ringReveal - dt * speed);
+      scheduleRender();
+      if (Math.abs(ringReveal - ringRevealTarget) < 0.001) {
+        ringReveal = ringRevealTarget;
+        ringAnimFrame = null;
+      } else {
+        ringAnimFrame = requestAnimationFrame(step);
+      }
+    };
+    ringAnimFrame = requestAnimationFrame(step);
+  };
+
   const listeners = new Set<ColorChangeCallback>();
   const rc = initWebGL(container, size);
 
@@ -106,7 +151,7 @@ export function createRoundedBoxPicker(
   const scheduleRender = () => {
     if (animId !== null) return;      animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal, ringAnchor, ringReveal, ringBand, alpha);
     });
   };
 
@@ -115,13 +160,13 @@ export function createRoundedBoxPicker(
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
     const hsb = rgbToHsb(finalRgb);
     const oklch = rgbToOklch(finalRgb);
-    const hex = rgbToHex(finalRgb);
+    const hex = alpha < 1 ? alphaHex(finalRgb, alpha) : rgbToHex(finalRgb);
     const out: ColorOutput = {
       rgb: finalRgb,
       hsb,
       oklch,
       hex,
-      alpha: 1.0,
+      alpha,
     };
     listeners.forEach(cb => cb(out));
   };
@@ -249,6 +294,46 @@ export function createRoundedBoxPicker(
     scheduleRender();
   };
 
+  // Canvas CSS coordinates from client coordinates (mirrors the raycast conversion).
+  const toCanvas = (clientX: number, clientY: number): Vec2 => {
+    const rect = rc.canvasGL.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) * (rc.width / rect.width),
+      y: (clientY - rect.top) * (rc.height / rect.height),
+    };
+  };
+  // Screen position of the pick dot (the current color's projection on the box).
+  const dotScreenPos = (): Vec2 =>
+    project3D(dotValues, rc.width * 0.36, { x: rc.width * 0.5, y: rc.height * 0.5 }, cam, box);
+  const hitDot = (clientX: number, clientY: number): boolean => {
+    const p = toCanvas(clientX, clientY);
+    const d = dotScreenPos();
+    return Math.hypot(p.x - d.x, p.y - d.y) <= 14;
+  };
+
+  // Inner ring: alpha (0..1). Outer ring: saturation via HSV S (hue + lightness kept).
+  const setAlphaInternal = (v: number) => {
+    alpha = Math.max(0, Math.min(1, v));
+    notify();
+    scheduleRender();
+  };
+  const setSaturationInternal = (v: number) => {
+    const rgb = valuesToRgb(dotValues, mode);
+    const hsb = rgbToHsb(rgb);
+    hsb.s = Math.max(0, Math.min(100, v * 100));
+    dotValues = rgbToValues(hsbToRgb(hsb), mode);
+    notify();
+    scheduleRender();
+  };
+  // Angle (0..1, 0 at 12 o'clock, clockwise) of the pointer around the ring anchor.
+  const ringValueAt = (p: Vec2): number => {
+    const dx = p.x - ringAnchor!.x;
+    const dy = p.y - ringAnchor!.y;
+    let ang = Math.atan2(dx, -dy);
+    if (ang < 0) ang += TWO_PI;
+    return ang / TWO_PI;
+  };
+
   // Saturation triangle: barycentric weights (a,b,g) of the pointer inside the projected
   // triangle (current color C / white W / black K), or null when outside / disabled.
   // Orthographic projection preserves barycentric coordinates, so the screen mix equals the 3D mix.
@@ -310,6 +395,16 @@ export function createRoundedBoxPicker(
         svAnchor = { ...dotValues };
         svMix = sv;
         applyTriangleMix(sv);
+      } else if (!isShiftHeld && hitDot(e.clientX, e.clientY)) {
+        // Press & hold the pick dot = reveal the alpha / saturation rings (no modifier).
+        // The dot is the current color's handle, so pressing it means "tune this color".
+        isRingDrag = true;
+        ringAnchor = dotScreenPos();
+        ringBand = null;
+        svAnchor = null;
+        svMix = null;
+        e.preventDefault();
+        animateRing(1);
       } else if (raycastAt(e.clientX, e.clientY)) {
         // Left Click / Drag on Box surface = Color Pick (re-anchors the triangle to the new color)
         isPicking = true;
@@ -333,7 +428,26 @@ export function createRoundedBoxPicker(
   });
 
   window.addEventListener('mousemove', (e) => {
-    if (isSVDrag) {
+    if (isRingDrag && ringAnchor) {
+      const p = toCanvas(e.clientX, e.clientY);
+      const dist = Math.hypot(p.x - ringAnchor.x, p.y - ringAnchor.y);
+      // Bands scale with the reveal animation; pointer distance picks the active ring
+      // (inner = alpha, outer = saturation), switchable mid-drag.
+      const eReveal = easeInOutQuad(ringReveal);
+      const rIn = RING_INNER_R * eReveal;
+      const rOut = RING_OUTER_R * eReveal;
+      const outBand = Math.abs(dist - rOut) <= 7;
+      const inBand = Math.abs(dist - rIn) <= 7;
+      const band: 'alpha' | 'sat' | null = outBand ? 'sat' : inBand ? 'alpha' : null;
+      ringBand = band;
+      if (band) {
+        const v = ringValueAt(p);
+        if (band === 'alpha') setAlphaInternal(v);
+        else setSaturationInternal(v);
+      } else {
+        scheduleRender();
+      }
+    } else if (isSVDrag) {
       const sv = triangleBarycentric(e.clientX, e.clientY);
       if (sv) {
         svMix = sv;
@@ -352,6 +466,11 @@ export function createRoundedBoxPicker(
   });
 
   window.addEventListener('mouseup', () => {
+    if (isRingDrag) {
+      isRingDrag = false;
+      ringBand = null;
+      animateRing(0);
+    }
     if (isSVDrag) {
       isSVDrag = false;
       // Keep svAnchor + svMix: the triangle stays anchored to the drag-start color and the marker
@@ -466,13 +585,14 @@ export function createRoundedBoxPicker(
         rgb: finalRgb,
         hsb: rgbToHsb(finalRgb),
         oklch: rgbToOklch(finalRgb),
-        hex: rgbToHex(finalRgb),
-        alpha: 1.0,
+        hex: alpha < 1 ? alphaHex(finalRgb, alpha) : rgbToHex(finalRgb),
+        alpha,
       };
     },
     setColor: (c: RGBColor) => {
       color = c;
       dotValues = rgbToValues(c, mode);
+      if (c.a !== undefined) alpha = Math.max(0, Math.min(1, c.a));
       svAnchor = null;
       svMix = null;
       notify();
@@ -537,6 +657,12 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getRadius: () => box.radius,
+    setAlpha: (a: number) => {
+      alpha = Math.max(0, Math.min(1, a));
+      notify();
+      scheduleRender();
+    },
+    getAlpha: () => alpha,
     getEdgeStyle: () => ({ ...edgeStyle }),
     setEdgeStyle: (style: Partial<EdgeStyleConfig>) => {
       edgeStyle = { ...edgeStyle, ...style };
@@ -557,6 +683,7 @@ export function createRoundedBoxPicker(
         centerY: v,
         centerZ: v,
         angleGuides: v,
+        svTriangle: guides.svTriangle, // feature switch, not a guide line — keep as-is
       };
       scheduleRender();
     },
@@ -569,6 +696,7 @@ export function createRoundedBoxPicker(
     destroy: () => {
       if (animId !== null) cancelAnimationFrame(animId);
       if (svAnimFrame !== null) cancelAnimationFrame(svAnimFrame);
+      if (ringAnimFrame !== null) cancelAnimationFrame(ringAnimFrame);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onWindowBlur);

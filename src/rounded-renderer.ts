@@ -5,6 +5,11 @@ import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
 import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb } from './color-math';
 
+/** Radius of the inner (alpha) ring around the pick dot, in canvas px. */
+export const RING_INNER_R = 26;
+/** Radius of the outer (saturation) ring around the pick dot, in canvas px. */
+export const RING_OUTER_R = 44;
+
 export interface WebGLRenderContext {
   gl: WebGLRenderingContext;
   overlayCtx: CanvasRenderingContext2D;
@@ -256,6 +261,10 @@ export function renderRoundedBox(
   svMix: { a: number; b: number; g: number } | null,
   svShow: boolean,
   svReveal: number,
+  ringAnchor: Vec2 | null,
+  ringReveal: number,
+  ringBand: 'sat' | 'alpha' | null,
+  alpha: number,
 ): void {
   const { gl, overlayCtx, width, height, program, uniforms } = rc;
   const dpr = window.devicePixelRatio || 1;
@@ -460,13 +469,85 @@ export function renderRoundedBox(
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
 
+    // Checkerboard underlay reveals transparency when alpha < 100% (clipped to the dot)
+    if (alpha < 1) {
+      overlayCtx.save();
+      overlayCtx.beginPath();
+      overlayCtx.arc(dotPos.x, dotPos.y, 6, 0, Math.PI * 2);
+      overlayCtx.clip();
+      const cs = 4;
+      for (let gy = -8; gy < 8; gy += cs) {
+        for (let gx = -8; gx < 8; gx += cs) {
+          overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
+          overlayCtx.fillRect(dotPos.x + gx, dotPos.y + gy, cs, cs);
+        }
+      }
+      overlayCtx.restore();
+    }
+
     overlayCtx.beginPath();
     overlayCtx.arc(dotPos.x, dotPos.y, 6, 0, Math.PI * 2);
-    overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+    overlayCtx.fillStyle = alpha < 1
+      ? `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`
+      : `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
     overlayCtx.fill();
     overlayCtx.strokeStyle = '#ffffff';
     overlayCtx.lineWidth = 2;
     overlayCtx.stroke();
+  }
+
+  // 2.3 Alpha / Saturation rings (pressed pick dot): outer = saturation (HSV S), inner = alpha.
+  // Rotation around the anchor sets the value (0 at 12 o'clock, clockwise); the pointer's
+  // radial band picks the active ring (highlighted). Rings scale in with the reveal animation.
+  if (ringAnchor && ringReveal > 0.01) {
+    const ease = ringReveal < 0.5 ? 2 * ringReveal * ringReveal : 1 - Math.pow(-2 * ringReveal + 2, 2) / 2;
+    const rIn = RING_INNER_R * ease;
+    const rOut = RING_OUTER_R * ease;
+    const rgb = valuesToRgb(dotValues, mode);
+    const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
+    const hsb = rgbToHsb(finalRgb);
+    const start = -Math.PI / 2; // 12 o'clock = 0%
+
+    overlayCtx.save();
+    overlayCtx.globalAlpha = Math.min(1, ease + 0.15);
+
+    const drawRing = (r: number, value: number, label: string, active: boolean, isAlpha: boolean) => {
+      // track
+      overlayCtx.lineWidth = active ? 5 : 3.5;
+      overlayCtx.beginPath();
+      overlayCtx.arc(ringAnchor.x, ringAnchor.y, r, 0, Math.PI * 2);
+      overlayCtx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+      overlayCtx.stroke();
+      // value arc (0 at 12 o'clock, clockwise)
+      const end = start + value * Math.PI * 2;
+      if (value > 0.001) {
+        overlayCtx.beginPath();
+        overlayCtx.arc(ringAnchor.x, ringAnchor.y, r, start, end);
+        if (isAlpha) {
+          // translucent color over a light underlay so the alpha reads against any box color
+          overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+          overlayCtx.stroke();
+          overlayCtx.beginPath();
+          overlayCtx.arc(ringAnchor.x, ringAnchor.y, r, start, end);
+          overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`;
+          overlayCtx.stroke();
+        } else {
+          overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+          overlayCtx.stroke();
+        }
+      }
+      // label
+      overlayCtx.fillStyle = active ? '#f8fafc' : 'rgba(203, 213, 225, 0.85)';
+      overlayCtx.font = '9px ui-monospace, SF Mono, monospace';
+      overlayCtx.textAlign = 'center';
+      overlayCtx.textBaseline = 'alphabetic';
+      overlayCtx.fillText(label, ringAnchor.x, ringAnchor.y - r + 1);
+    };
+
+    drawRing(rOut, hsb.s / 100, 'SAT', ringBand === 'sat', false);
+    drawRing(rIn, alpha, 'A', ringBand === 'alpha', true);
+
+    overlayCtx.restore();
   }
 
   overlayCtx.restore();

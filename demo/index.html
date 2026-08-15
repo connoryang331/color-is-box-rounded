@@ -456,6 +456,13 @@
           <input type="text" id="v-radius" value="16%">
         </div>
       </div>
+      <div class="row">
+        <span class="label" style="color: #a855f7;">ALPHA</span>
+        <div class="blender-slider" id="slider-alpha">
+          <div class="bar" style="background: #a855f7; opacity: 0.22;"></div>
+          <input type="text" id="v-alpha" value="100%">
+        </div>
+      </div>
 
       <!-- Quick Preset Icon Buttons (Cube / Cuboid) -->
       <div style="margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -498,7 +505,7 @@
           <label class="guide-toggle-item"><input type="checkbox" id="g-cx" checked><span class="guide-dot red"></span> Center X</label>
           <label class="guide-toggle-item"><input type="checkbox" id="g-cy" checked><span class="guide-dot green"></span> Center Y</label>
           <label class="guide-toggle-item"><input type="checkbox" id="g-cz" checked><span class="guide-dot blue"></span> Center Z</label>
-          <label class="guide-toggle-item"><input type="checkbox" id="g-sv" checked><span style="width:6px;height:6px;display:inline-block;background:transparent;border-left:3px solid transparent;border-right:3px solid transparent;border-bottom:6px solid #f59e0b;"></span> SV Triangle</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="g-sv"><span style="width:6px;height:6px;display:inline-block;background:transparent;border-left:3px solid transparent;border-right:3px solid transparent;border-bottom:6px solid #f59e0b;"></span> SV Triangle</label>
         </div>
       </div>
 
@@ -581,11 +588,12 @@
       </div>
 
       <!-- Vertical aligned gray values -->
-      <div style="display: flex; flex-direction: column; justify-content: space-between; height: 76px; font: 12px/1.4 ui-monospace, 'SF Mono', 'Cascadia Code', monospace;">
+      <div style="display: flex; flex-direction: column; justify-content: space-between; height: 95px; font: 12px/1.4 ui-monospace, 'SF Mono', 'Cascadia Code', monospace;">
         <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">HEX</span><span id="v-hex" style="color: var(--text-val); font-weight: 500;">#ffffff</span></div>
         <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">RGB</span><span id="v-rgb" style="color: var(--text-val); font-weight: 500;">255, 255, 255</span></div>
         <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">HSV</span><span id="v-hsv" style="color: var(--text-val); font-weight: 500;">0.0, 0.0, 100.0</span></div>
         <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">OKLCH</span><span id="v-oklch" style="color: var(--text-val); font-weight: 500;">1.000, 0.000, 0.0</span></div>
+        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">ALPHA</span><span id="v-alpha-display" style="color: var(--text-val); font-weight: 500;">100%</span></div>
       </div>
     </div>
 
@@ -605,7 +613,8 @@
     <h3>Blender 3D Controls</h3>
     <ul class="tips" style="padding-left: 16px; margin: 0; font-size: 11px; line-height: 1.6; color: var(--text-body);">
       <li><b>Left Click / Drag</b>: pick color on the box surface &amp; move the picker dot; drag on <b>empty area</b> to orbit the view (grab cursor)</li>
-      <li><b>SV Triangle</b>: hold <b>Shift</b> to unfold the saturation triangle from the current color, then drag inside it to lighten, darken, or desaturate the current hue (marker dot shows your position; release Shift to fold it back)</li>
+      <li><b>Press &amp; hold the pick dot</b>: two rings unfold around it — <b>outer = saturation</b>, <b>inner = alpha</b>. Rotate the pointer around the dot to set the value (pointer distance picks the active ring, switchable mid-drag); release to fold them back</li>
+      <li><b>SV Triangle</b> (optional toggle, off by default): hold <b>Shift</b> to unfold the saturation triangle from the current color, then drag inside it to lighten, darken, or desaturate the current hue (marker dot shows your position; release Shift to fold it back)</li>
       <li><b>Middle / Alt+Left Drag</b>: free 360° viewport orbit (Blender 3D style)</li>
       <li><b>Mouse Wheel</b>: smooth viewport zoom (0.2x ~ 2.5x)</li>
       <li><b>Double Click</b>: on box = invert color (white ↔ black); on empty = reset view</li>
@@ -622,6 +631,7 @@
       document.getElementById('v-rgb').textContent = c.rgb.r + ', ' + c.rgb.g + ', ' + c.rgb.b;
       document.getElementById('v-hsv').textContent = c.hsb.h.toFixed(1) + ', ' + c.hsb.s.toFixed(1) + ', ' + c.hsb.b.toFixed(1);
       document.getElementById('v-oklch').textContent = c.oklch.l.toFixed(3) + ', ' + c.oklch.c.toFixed(3) + ', ' + c.oklch.h.toFixed(1);
+      document.getElementById('v-alpha-display').textContent = Math.round(c.alpha * 100) + '%';
 
       // Update 3D Preview Cube facets with subtle 3D lighting
       const { r, g, b } = c.rgb;
@@ -650,6 +660,7 @@
         sizeX: dim.sizeX, sizeY: dim.sizeY, sizeZ: dim.sizeZ,
         zoom: Math.round(picker.getZoom() * 100) / 100,
         radius: Math.round(picker.getRadius() * 1000) / 1000,
+        alpha: Math.round(picker.getAlpha() * 100) / 100,
         mode: picker.getMode(),
         hex: col.hex,
       });
@@ -660,14 +671,18 @@
       if (!p || typeof p !== 'object') return;
       try {
         if (typeof p.mode === 'string' && p.mode !== picker.getMode()) picker.setMode(p.mode);
-        if (typeof p.hex === 'string' && /^#[0-9a-f]{6}$/i.test(p.hex)) {
+        if (typeof p.hex === 'string' && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(p.hex)) {
           const h = p.hex.replace('#', '');
-          picker.setColor({ r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) });
+          const a = h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : undefined;
+          picker.setColor(a !== undefined
+            ? { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16), a }
+            : { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) });
         }
         if (typeof p.rotX === 'number') picker.setAxisRotation(p.rotX, p.rotY, p.rotZ);
         if (typeof p.sizeX === 'number') picker.setDimensions(p.sizeX, p.sizeY, p.sizeZ);
         if (typeof p.zoom === 'number') picker.setZoom(p.zoom);
         if (typeof p.radius === 'number') picker.setRadius(p.radius);
+        if (typeof p.alpha === 'number') picker.setAlpha(p.alpha);
       } catch (e) { /* ignore malformed storage */ }
     };
     restoreParams();
@@ -941,6 +956,7 @@
     }, 0.2, 2.5, '', 2);
 
     // RADIUS percentage slider (0% = sharp cube, 100% = fully beveled sphere/capsule)
+    const sAlpha = makeGenericSlider('slider-alpha', 'v-alpha', () => picker.getAlpha ? picker.getAlpha() * 100 : 100, (v) => { if (picker.setAlpha) picker.setAlpha(v / 100); }, 0, 100, '%', 0);
     const sRadius = makeGenericSlider(
       'slider-radius',
       'v-radius',
@@ -1057,6 +1073,7 @@
         sizeZ: dim.sizeZ,
         zoom: Math.round(picker.getZoom() * 100) / 100,
         radius: Math.round(picker.getRadius() * 1000) / 1000,
+        alpha: Math.round(col.alpha * 100) / 100,
         mode: picker.getMode(),
         hex: col.hex,
         rgb: { r: col.rgb.r, g: col.rgb.g, b: col.rgb.b },
@@ -1072,6 +1089,7 @@
       `SIZE Z: ${p.sizeZ}`,
       `ZOOM: ${p.zoom}x`,
       `RADIUS: ${Math.round((p.radius / 0.50) * 100)}%`,
+      `ALPHA: ${Math.round(p.alpha * 100)}%`,
       `MODE: ${p.mode.toUpperCase()}`,
       `HEX: ${p.hex}`,
       `RGB: ${p.rgb.r}, ${p.rgb.g}, ${p.rgb.b}`,
@@ -1100,6 +1118,7 @@
       sSizeY.update();
       sSizeZ.update();
       sRadius.update();
+      sAlpha.update();
       sEfW.update();
       sEbW.update();
       maybeSaveParams();
