@@ -353,14 +353,17 @@ export function renderRoundedBox(
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // 2. Render 2D Overlay (Spatial Guides & Pick Dot)
+  // 2. Render 2D Overlay (12 Edges, Spatial Guides & Pick Dot)
   overlayCtx.save();
   overlayCtx.clearRect(0, 0, width, height);
 
   const scale = width * 0.26;
   const center: Vec2 = { x: width * 0.5, y: height * 0.5 };
 
-  // 2.1 Draw Spatial Guides
+  // 2.1 Draw 12 Cube Edges & Corner Arcs (Crisp 2D Vector)
+  draw12Edges(overlayCtx, scale, center, cam, box, edgeStyle);
+
+  // 2.2 Draw Spatial Guides
   drawGuides(overlayCtx, scale, center, cam, box, guides);
 
   // 2.2 Draw Pick Dot

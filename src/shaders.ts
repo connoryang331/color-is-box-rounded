@@ -172,45 +172,6 @@ void main() {
     float rim = pow(1.0 - max(dot(nCam, vec3(0.0, 0.0, -1.0)), 0.0), 3.0) * 0.08;
     vec3 finalCol = col + vec3(rim);
 
-    // Exact 3D Rounded Box Edge Detection
-    // For a rounded box, the flat faces end at abs(pLocal) = halfSize - rad.
-    // The fillet transitions happen when coordinates enter the rounded region [halfSize - rad, halfSize].
-    vec3 q = abs(pLocal) - (halfSize - rad);
-    
-    // Count how many axes have reached the outer boundary
-    float countAxes = (q.x > 0.0 ? 1.0 : 0.0) + (q.y > 0.0 ? 1.0 : 0.0) + (q.z > 0.0 ? 1.0 : 0.0);
-    
-    // Compute distance to the 12 outer edge crests in 3D
-    vec3 dEdge = abs(abs(pLocal) - halfSize);
-    
-    // Is edge crest in front facing or back facing?
-    bool isFront = nCam.z > 0.0;
-
-    if (u_show_front && isFront) {
-      // 12 棱边主脊线与圆弧过渡边 (Edge crests)
-      float edgeThreshold = (u_front_width * 0.003) / u_zoom;
-      
-      // An edge crest in rounded box is where at least two coordinates approach the boundary
-      float eDistXY = max(dEdge.x, dEdge.y);
-      float eDistXZ = max(dEdge.x, dEdge.z);
-      float eDistYZ = max(dEdge.y, dEdge.z);
-      float minEdgeDist = min(min(eDistXY, eDistXZ), eDistYZ);
-
-      // Fillet boundary seam lines (平滑圆弧与平面的相切分段线 / Segments seam lines)
-      vec3 dSeam = abs(q);
-      float seamDist = min(min(dSeam.x, dSeam.y), dSeam.z);
-
-      if (rad > 0.01 && seamDist < edgeThreshold && countAxes >= 1.0) {
-        // 倒角与平面的切线分段线 (Fillet seam segments)
-        finalCol = mix(finalCol, u_front_color.rgb, u_front_color.a * 0.45);
-      }
-      
-      if (minEdgeDist < edgeThreshold && countAxes >= 1.5) {
-        // 12 条棱边主轮廓线 (Main outer edge crests)
-        finalCol = mix(finalCol, u_front_color.rgb, u_front_color.a);
-      }
-    }
-
     gl_FragColor = vec4(clamp(finalCol, 0.0, 1.0), 1.0);
   } else {
     discard; // Transparent background
