@@ -30,27 +30,27 @@
   }
 
   body.dark-theme {
-    --bg-page: #111827;
-    --bg-panel: #1f2937;
-    --border-panel: #374151;
-    --border-dashed: #374151;
-    --text-title: #f9fafb;
-    --text-subtitle: #6b7280;
-    --text-h3: #6b7280;
-    --text-label: #9ca3af;
+    --bg-page: #303030;
+    --bg-panel: #242424;
+    --border-panel: #3e3e3e;
+    --border-dashed: #3e3e3e;
+    --text-title: #f3f4f6;
+    --text-subtitle: #888888;
+    --text-h3: #888888;
+    --text-label: #a0a0a0;
     --text-val: #f3f4f6;
-    --text-val-dim: #6b7280;
-    --text-body: #9ca3af;
-    --bg-slider: #111827;
-    --border-slider: #374151;
-    --border-slider-hover: #4b5563;
+    --text-val-dim: #888888;
+    --text-body: #a0a0a0;
+    --bg-slider: #1c1c1c;
+    --border-slider: #3e3e3e;
+    --border-slider-hover: #555555;
     --text-slider: #f3f4f6;
-    --bg-btn: #111827;
-    --border-btn: #374151;
+    --bg-btn: #1c1c1c;
+    --border-btn: #3e3e3e;
     --text-btn: #e5e7eb;
-    --bg-btn-hover: #374151;
-    --shadow-panel: 0 8px 24px rgba(0,0,0,.35);
-    --shadow-slider: 0 1px 2px rgba(0,0,0,0.2);
+    --bg-btn-hover: #353535;
+    --shadow-panel: 0 8px 24px rgba(0,0,0,.45);
+    --shadow-slider: 0 1px 2px rgba(0,0,0,0.3);
   }
 
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 40px; margin: 0; background: var(--bg-page); color: var(--text-body); box-sizing: border-box; transition: background 0.2s, color 0.2s; }
@@ -386,10 +386,10 @@
 
       <!-- Vertical aligned gray values -->
       <div style="display: flex; flex-direction: column; justify-content: space-between; height: 76px; font: 12px/1.4 ui-monospace, 'SF Mono', 'Cascadia Code', monospace;">
-        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: #9ca3af;">HEX</span><span id="v-hex" style="color: #374151; font-weight: 500;">#ffffff</span></div>
-        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: #9ca3af;">RGB</span><span id="v-rgb" style="color: #374151; font-weight: 500;">255, 255, 255</span></div>
-        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: #9ca3af;">HSV</span><span id="v-hsv" style="color: #374151; font-weight: 500;">0.0, 0.0, 100.0</span></div>
-        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: #9ca3af;">OKLCH</span><span id="v-oklch" style="color: #374151; font-weight: 500;">1.000, 0.000, 0.0</span></div>
+        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">HEX</span><span id="v-hex" style="color: var(--text-val); font-weight: 500;">#ffffff</span></div>
+        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">RGB</span><span id="v-rgb" style="color: var(--text-val); font-weight: 500;">255, 255, 255</span></div>
+        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">HSV</span><span id="v-hsv" style="color: var(--text-val); font-weight: 500;">0.0, 0.0, 100.0</span></div>
+        <div style="display: flex; align-items: center;"><span style="width: 58px; font-weight: 600; color: var(--text-val-dim);">OKLCH</span><span id="v-oklch" style="color: var(--text-val); font-weight: 500;">1.000, 0.000, 0.0</span></div>
       </div>
     </div>
 
@@ -398,7 +398,7 @@
 
   <div class="panel-info" id="how-card">
     <h3>Blender 3D Controls</h3>
-    <ul class="tips" style="padding-left: 16px; margin: 0; font-size: 11px; line-height: 1.6; color: #4b5563;">
+    <ul class="tips" style="padding-left: 16px; margin: 0; font-size: 11px; line-height: 1.6; color: var(--text-body);">
       <li><b>Left Click / Drag (左键点击/拖拽)</b>: 在 3D 倒角几何体表面取色并移动拾色指示器</li>
       <li><b>Middle Mouse Drag (鼠标中键拖拽 / Alt+左键)</b>: 3D 自由空间无极 360° 视口旋转 (Blender 3D 规范)</li>
       <li><b>Mouse Wheel (滚轮)</b>: 3D 视口平滑缩放 (0.2x ~ 2.5x)</li>
