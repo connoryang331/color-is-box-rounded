@@ -190,7 +190,7 @@
         <span class="label" style="color: #d97706;">RADIUS</span>
         <div class="blender-slider" id="slider-radius">
           <div class="bar" style="background: #d97706; opacity: 0.22;"></div>
-          <input type="text" id="v-radius" value="0.08">
+          <input type="text" id="v-radius" value="16%">
         </div>
       </div>
 
@@ -563,9 +563,19 @@
       picker.setDimensions(d.sizeX, d.sizeY, v);
     }, 0.2, 2.5, '', 2);
 
-    const sRadius = makeGenericSlider('slider-radius', 'v-radius', () => picker.getRadius(), (v) => {
-      picker.setRadius(v);
-    }, 0.0, 0.50, '', 2);
+    // RADIUS 百分比滑块 (0% 为直角立方体，100% 为完整 3D 倒角球体/胶囊体)
+    const sRadius = makeGenericSlider(
+      'slider-radius',
+      'v-radius',
+      () => Math.round((picker.getRadius() / 0.50) * 100),
+      (pct) => {
+        picker.setRadius((pct / 100) * 0.50);
+      },
+      0,
+      100,
+      '%',
+      0
+    );
 
     const sX = initBlenderSlider('slider-rot-x', 'v-rot-x', 'x', -180, 180);
     const sY = initBlenderSlider('slider-rot-y', 'v-rot-y', 'y', -180, 180);
