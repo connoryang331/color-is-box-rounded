@@ -5,40 +5,86 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Color Is Box Rounded — True 3D Bevel Raymarching Demo</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 40px; margin: 0; background: #f3f4f6; box-sizing: border-box; }
+  :root {
+    --bg-page: #f3f4f6;
+    --bg-panel: #ffffff;
+    --border-panel: #e5e7eb;
+    --border-dashed: #e5e7eb;
+    --text-title: #374151;
+    --text-subtitle: #9ca3af;
+    --text-h3: #9ca3af;
+    --text-label: #6b7280;
+    --text-val: #111827;
+    --text-val-dim: #9ca3af;
+    --text-body: #4b5563;
+    --bg-slider: #ffffff;
+    --border-slider: #d1d5db;
+    --border-slider-hover: #9ca3af;
+    --text-slider: #1f2937;
+    --bg-btn: #f3f4f6;
+    --border-btn: #d1d5db;
+    --text-btn: #374151;
+    --bg-btn-hover: #e5e7eb;
+    --shadow-panel: 0 6px 20px rgba(0,0,0,.07);
+    --shadow-slider: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  body.dark-theme {
+    --bg-page: #111827;
+    --bg-panel: #1f2937;
+    --border-panel: #374151;
+    --border-dashed: #374151;
+    --text-title: #f9fafb;
+    --text-subtitle: #6b7280;
+    --text-h3: #6b7280;
+    --text-label: #9ca3af;
+    --text-val: #f3f4f6;
+    --text-val-dim: #6b7280;
+    --text-body: #9ca3af;
+    --bg-slider: #111827;
+    --border-slider: #374151;
+    --border-slider-hover: #4b5563;
+    --text-slider: #f3f4f6;
+    --bg-btn: #111827;
+    --border-btn: #374151;
+    --text-btn: #e5e7eb;
+    --bg-btn-hover: #374151;
+    --shadow-panel: 0 8px 24px rgba(0,0,0,.35);
+    --shadow-slider: 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 40px; margin: 0; background: var(--bg-page); color: var(--text-body); box-sizing: border-box; transition: background 0.2s, color 0.2s; }
   .center-col { display: flex; flex-direction: column; align-items: center; gap: 0; }
-  h1 { margin: 0 0 16px; font-size: 18px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #374151; text-align: center; }
-  .subtitle { margin: 14px 0 0; font-size: 12px; font-weight: 400; letter-spacing: .04em; color: #9ca3af; text-align: center; }
-  .panel-holder { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.07); padding: 0; overflow: hidden; }
-  .panel-info { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 20px 24px; box-shadow: 0 6px 20px rgba(0,0,0,.07); width: 320px; min-height: 252px; box-sizing: border-box; display: flex; flex-direction: column; }
+  h1 { margin: 0 0 16px; font-size: 18px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-title); text-align: center; }
+  .subtitle { margin: 14px 0 0; font-size: 12px; font-weight: 400; letter-spacing: .04em; color: var(--text-subtitle); text-align: center; }
+  .panel-holder { background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 14px; box-shadow: var(--shadow-panel); padding: 0; overflow: hidden; }
+  .panel-info { background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 14px; padding: 20px 24px; box-shadow: var(--shadow-panel); width: 320px; min-height: 252px; box-sizing: border-box; display: flex; flex-direction: column; }
   #current-card { position: fixed; right: 24px; bottom: 24px; }
   #how-card { position: fixed; left: 24px; bottom: 24px; }
-  h3 { margin: 0 0 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9ca3af; }
+  h3 { margin: 0 0 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-h3); }
   .rows { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .row { display: flex; align-items: center; padding: 7px 0; }
-  .row .label { font-size: 12px; font-weight: 600; color: #6b7280; letter-spacing: .01em; width: 62px; flex-shrink: 0; }
-  /* Left aligned values - strictly vertically aligned */
-  .row .val { font: 12.5px/1.5 ui-monospace, "SF Mono", "Cascadia Code", monospace; color: #111827; letter-spacing: .01em; text-align: left; margin-left: 0; flex: 1; }
+  .row .label { font-size: 12px; font-weight: 600; color: var(--text-label); letter-spacing: .01em; width: 62px; flex-shrink: 0; }
+  .row .val { font: 12.5px/1.5 ui-monospace, "SF Mono", "Cascadia Code", monospace; color: var(--text-val); letter-spacing: .01em; text-align: left; margin-left: 0; flex: 1; }
 
-  /* Blender-style numeric slider (Light Clean White Theme) */
+  /* Blender-style numeric slider */
   .blender-slider {
     position: relative;
     display: flex;
     align-items: center;
     width: 155px;
     height: 26px;
-    background: #ffffff;
-    border: 1px solid #d1d5db;
+    background: var(--bg-slider);
+    border: 1px solid var(--border-slider);
     border-radius: 5px;
     overflow: hidden;
     cursor: ew-resize;
     user-select: none;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-    transition: border-color 0.15s;
+    box-shadow: var(--shadow-slider);
+    transition: border-color 0.15s, background 0.15s;
   }
   .blender-slider:hover {
-    border-color: #9ca3af;
-    background: #fafafa;
+    border-color: var(--border-slider-hover);
   }
   .blender-slider .bar {
     position: absolute;
@@ -63,7 +109,7 @@
     text-align: center;
     font: 12px/26px ui-monospace, "SF Mono", monospace;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-slider);
     cursor: ew-resize;
     padding: 0 4px;
     box-sizing: border-box;
@@ -71,8 +117,8 @@
   }
   .blender-slider.typing input,
   .blender-slider input:focus {
-    background: #ffffff;
-    color: #111827;
+    background: var(--bg-slider);
+    color: var(--text-val);
     cursor: text;
     border: 1px solid #3b82f6;
     pointer-events: auto;
@@ -81,7 +127,7 @@
   .guides-panel {
     margin-top: 14px;
     padding-top: 12px;
-    border-top: 1px dashed #e5e7eb;
+    border-top: 1px dashed var(--border-dashed);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -97,21 +143,21 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .06em;
-    color: #6b7280;
+    color: var(--text-label);
   }
   .btn-all-group { display: flex; gap: 4px; }
   .btn-mini {
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
+    background: var(--bg-btn);
+    border: 1px solid var(--border-btn);
     border-radius: 4px;
     font-size: 10px;
     font-weight: 600;
     padding: 2px 6px;
     cursor: pointer;
-    color: #374151;
+    color: var(--text-btn);
     transition: all 0.15s;
   }
-  .btn-mini:hover { background: #e5e7eb; color: #111827; }
+  .btn-mini:hover { background: var(--bg-btn-hover); color: var(--text-val); }
   .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .guide-toggle-item {
     display: flex;
@@ -119,7 +165,7 @@
     gap: 6px;
     font-size: 11px;
     font-weight: 500;
-    color: #4b5563;
+    color: var(--text-body);
     cursor: pointer;
     user-select: none;
   }
@@ -128,9 +174,50 @@
   .guide-dot.red { background: #ef4444; }
   .guide-dot.green { background: #22c55e; }
   .guide-dot.blue { background: #3b82f6; }
+
+  /* Theme Toggle Floating Button */
+  .theme-toggle-btn {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-panel);
+    box-shadow: var(--shadow-panel);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-title);
+    transition: transform 0.15s, background 0.2s, border-color 0.2s;
+    z-index: 100;
+  }
+  .theme-toggle-btn:hover {
+    transform: scale(1.06);
+  }
 </style>
 </head>
 <body>
+  <!-- Theme Toggle Floating Button -->
+  <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Dark / Light Theme">
+    <svg id="theme-icon-sun" style="display: none;" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+    <svg id="theme-icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+    </svg>
+  </button>
+
   <div class="panel-info" id="current-card" style="width: 320px;">
     <h3>Transform & Guides</h3>
     <div class="rows">
@@ -637,6 +724,33 @@
       picker.setDimensions(1.5, 0.7, 1.0);
       picker.setRadius(0.06);
       picker.setColor({ r: 255, g: 255, b: 255 });
+    });
+
+    // ── Dark / Light Theme Toggle ──
+    const btnTheme = document.getElementById('theme-toggle');
+    const iconSun = document.getElementById('theme-icon-sun');
+    const iconMoon = document.getElementById('theme-icon-moon');
+
+    const applyTheme = (isDark) => {
+      if (isDark) {
+        document.body.classList.add('dark-theme');
+        iconSun.style.display = 'block';
+        iconMoon.style.display = 'none';
+      } else {
+        document.body.classList.remove('dark-theme');
+        iconSun.style.display = 'none';
+        iconMoon.style.display = 'block';
+      }
+      localStorage.setItem('cib_theme', isDark ? 'dark' : 'light');
+    };
+
+    const savedTheme = localStorage.getItem('cib_theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(savedTheme === 'dark' || (!savedTheme && prefersDark));
+
+    btnTheme.addEventListener('click', () => {
+      const isDark = document.body.classList.contains('dark-theme');
+      applyTheme(!isDark);
     });
 
     const updateLoop = () => {
