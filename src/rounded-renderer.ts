@@ -514,10 +514,10 @@ export function renderRoundedBox(
   if (ring && ring.reveal > 0.01) {
     const anchorPt = ring.anchor;
     const ease = ring.reveal < 0.5 ? 2 * ring.reveal * ring.reveal : 1 - Math.pow(-2 * ring.reveal + 2, 2) / 2;
-    const cR = RING_CENTER_R * ease;                      // center color-plate radius
-    const rIn = (RING_CENTER_R + RING_W / 2) * ease;      // alpha band center
-    const rOut = (RING_CENTER_R + RING_W * 1.5) * ease;   // sat band center
-    const wRing = RING_W * ease;                          // both bands share the same width
+    const cR = RING_CENTER_R * ease;                       // center color-plate radius
+    const rSat = (RING_CENTER_R + RING_W / 2) * ease;      // INNER ring = saturation band center
+    const rAlp = (RING_CENTER_R + RING_W * 1.5) * ease;    // OUTER ring = alpha band center
+    const wRing = RING_W * ease;                           // both bands share the same width
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
     const start = -Math.PI / 2; // 12 o'clock = 0%
@@ -556,10 +556,10 @@ export function renderRoundedBox(
       }
     };
 
-    // Ring label above 12 o'clock, bold with a dark outline so it reads over any face color
-    const ringLabel = (text: string, r: number, w: number, active: boolean) => {
+    // Widget label above 12 o'clock, bold with a dark outline so it reads over any face color
+    const ringLabel = (text: string, r: number, active: boolean) => {
       const x = anchorPt.x;
-      const y = anchorPt.y - (r + w / 2) - 2;
+      const y = anchorPt.y - (r + wRing / 2) - 2;
       overlayCtx.font = '700 12px ui-monospace, SF Mono, monospace';
       overlayCtx.textAlign = 'center';
       overlayCtx.textBaseline = 'alphabetic';
@@ -570,10 +570,10 @@ export function renderRoundedBox(
       overlayCtx.fillText(text, x, y);
     };
 
-    // Outer ring — SATURATION: the C / white / black triangle perimeter wrapped into a ring
-    // (top = anchor color, right = black, bottom = gray, left = white). Dragging around it sets
-    // the color to the ring color at the pointer angle (hue preserved). A marker dot shows the
-    // current position on the ring.
+    // INNER ring — SATURATION: the C / white / black triangle perimeter wrapped into a ring
+    // (top = anchor color, right = black, bottom = gray, left = white), hugging the center
+    // color. Dragging around it sets the color to the ring color at the pointer angle (hue
+    // preserved); a marker dot shows the current position on the ring.
     const anchorValues = ring.colorAnchor || dotValues;
     const anchorRgb = valuesToRgb(anchorValues, mode);
     const nSeg = 72;
@@ -582,14 +582,14 @@ export function renderRoundedBox(
       const a0 = start + i * segStep;
       const col = ringColorAt(anchorRgb, i * segStep);
       overlayCtx.beginPath();
-      overlayCtx.arc(anchorPt.x, anchorPt.y, rOut, a0, a0 + segStep + 0.012); // tiny overlap hides seam gaps
+      overlayCtx.arc(anchorPt.x, anchorPt.y, rSat, a0, a0 + segStep + 0.012); // tiny overlap hides seam gaps
       overlayCtx.lineWidth = wRing;
       overlayCtx.lineCap = 'butt';
       overlayCtx.strokeStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
       overlayCtx.stroke();
     }
-    const mkx = anchorPt.x + rOut * Math.sin(ring.angle);
-    const mky = anchorPt.y - rOut * Math.cos(ring.angle);
+    const mkx = anchorPt.x + rSat * Math.sin(ring.angle);
+    const mky = anchorPt.y - rSat * Math.cos(ring.angle);
     overlayCtx.beginPath();
     overlayCtx.arc(mkx, mky, 4, 0, Math.PI * 2);
     overlayCtx.fillStyle = '#ffffff';
@@ -597,45 +597,32 @@ export function renderRoundedBox(
     overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
     overlayCtx.lineWidth = 1.4;
     overlayCtx.stroke();
-    bandEdges(rOut, wRing, ring.band === 'sat');
-    ringLabel('SAT', rOut, wRing, ring.band === 'sat');
+    bandEdges(rSat, wRing, ring.band === 'sat');
 
-    // Inner ring — ALPHA: checkerboard track (standard transparency-bar look in ring form);
+    // OUTER ring — ALPHA: checkerboard track (standard transparency-bar look in ring form);
     // the value arc is the color at its alpha over the checkerboard, so the arc itself shows
     // the exact result and the empty arc reads as fully transparent.
-    checkerBand(rIn, wRing);
+    checkerBand(rAlp, wRing);
     const alphaEnd = start + alpha * Math.PI * 2;
     if (alpha > 0.001) {
       overlayCtx.beginPath();
-      overlayCtx.arc(anchorPt.x, anchorPt.y, rIn, start, alphaEnd);
+      overlayCtx.arc(anchorPt.x, anchorPt.y, rAlp, start, alphaEnd);
       overlayCtx.lineWidth = wRing;
       overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`;
       overlayCtx.stroke();
     }
-    bandEdges(rIn, wRing, ring.band === 'alpha');
+    bandEdges(rAlp, wRing, ring.band === 'alpha');
+    ringLabel('SAT', rAlp, ring.band === 'sat');
 
-    // Center plate — the current color itself (checkerboard shows through when alpha < 100%):
-    // a live swatch of exactly what the color looks like at its transparency.
-    overlayCtx.save();
+    // Center circle — the current color at its alpha over the box (the enlarged pick
+    // indicator): it updates live as the rings change, and shows translucency by letting the
+    // box show through — no checkerboard pattern in the middle.
     overlayCtx.beginPath();
     overlayCtx.arc(anchorPt.x, anchorPt.y, cR, 0, Math.PI * 2);
-    overlayCtx.clip();
-    if (alpha < 1) {
-      const cs = 6;
-      for (let gy = -cR; gy < cR; gy += cs) {
-        for (let gx = -cR; gx < cR; gx += cs) {
-          overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
-          overlayCtx.fillRect(anchorPt.x + gx, anchorPt.y + gy, cs, cs);
-        }
-      }
-    }
     overlayCtx.fillStyle = alpha < 1
       ? `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`
       : `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-    overlayCtx.fillRect(anchorPt.x - cR, anchorPt.y - cR, cR * 2, cR * 2);
-    overlayCtx.restore();
-    overlayCtx.beginPath();
-    overlayCtx.arc(anchorPt.x, anchorPt.y, cR, 0, Math.PI * 2);
+    overlayCtx.fill();
     overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
     overlayCtx.lineWidth = 2;
     overlayCtx.stroke();

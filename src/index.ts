@@ -463,7 +463,8 @@ export function createRoundedBoxPicker(
       } else if (ringLockedBand) {
         band = ringLockedBand;
       } else {
-        band = outBand ? 'sat' : inBand ? 'alpha' : null;
+        // saturation ring is INNER (hugging the center color), alpha ring is OUTER
+        band = inBand ? 'sat' : outBand ? 'alpha' : null;
       }
       if (band !== ringBand) {
         ringBand = band;
