@@ -13,14 +13,16 @@ Tiny, framework-agnostic, works everywhere.
 - 🎥 **Blender-style viewport** — middle-drag (or drag on empty space) orbits a separate *camera*;
   object rotation values never change while orbiting
 - 🖱 **Pixel-exact picking** — CPU raycast mirrors the GPU shader exactly (same SDF, same matrix inverse)
-- 🎯 **Pick dot rings** — press & hold the picker dot: two rings unfold around it. **Outer =
-  saturation** — the C / white / black triangle perimeter wrapped into a full gradient ring
-  (top = current color, left = white, right = black, bottom = gray); rotating around the dot walks
-  that loop (hue preserved, marker dot shows the position). **Inner = alpha** — a checkerboard
-  transparency ring whose arc shows the color at its alpha. Pointer distance picks the active ring
-  (switchable mid-drag, with a 10° rotation guard so crossing the inner ring never changes alpha
-  accidentally); release folds them back. Semi-transparent colors show a checkerboard under the
-  dot and an 8-digit `#RRGGBBAA` hex
+- 🎯 **Pick dot rings** — press & hold the picker dot: a **center plate shows the current color**
+  (checkerboard shows through when semi-transparent), surrounded by two **touching, equal-width
+  rings**. **Outer = saturation** — the C / white / black triangle perimeter wrapped into a full
+  gradient ring (top = current color, left = white, right = black, bottom = gray); rotating around
+  the dot walks that loop (hue preserved, marker dot shows the position). **Inner = alpha** — a
+  checkerboard transparency ring whose arc shows the color at its alpha. Rotating ≥10° engages a
+  ring, which then stays locked until release (drag through the center plate to switch rings — a
+  chord across the sat ring passes through the inner band, so locking keeps it from stealing the
+  drag); release folds them back. Semi-transparent colors show a checkerboard under the dot and an
+  8-digit `#RRGGBBAA` hex
 - 🔺 **Saturation triangle** (optional, off by default — SV Triangle toggle): hold **Shift** to reveal
   a current-color / white / black triangle overlaid on the cube; dragging inside it adjusts
   saturation & brightness while preserving hue (barycentric mix, exact GPU gradient). A marker dot
@@ -117,7 +119,7 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | Gesture | Action |
 | --- | --- |
 | Left click / drag on box | pick color & move the picker dot |
-| **Press & hold the pick dot** | two rings unfold — outer = saturation (gradient ring: top color, left white, right black, bottom gray), inner = alpha (checkerboard); rotate around the dot to set, release to fold |
+| **Press & hold the pick dot** | center plate = current color + two touching rings — outer = saturation (gradient: top color, left white, right black, bottom gray), inner = alpha (checkerboard); rotate ≥10° to engage a ring (locks until release; drag through the center to switch), release to fold |
 | Left drag on **empty area** | orbit the viewport (grab cursor) |
 | Middle drag / Alt + Left drag | free 360° viewport orbit (Blender style) |
 | Mouse wheel | smooth zoom (0.2× – 2.5×) |

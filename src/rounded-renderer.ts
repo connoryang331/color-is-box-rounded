@@ -5,14 +5,10 @@ import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
 import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb, ringColorAt } from './color-math';
 
-/** Radius (band center) of the inner (alpha) ring around the pick dot, in canvas px. */
-export const RING_INNER_R = 30;
-/** Band width of the inner (alpha) ring, in canvas px. */
-export const RING_INNER_W = 12;
-/** Radius (band center) of the outer (saturation) ring around the pick dot, in canvas px. */
-export const RING_OUTER_R = 56;
-/** Band width of the outer (saturation) ring, in canvas px. */
-export const RING_OUTER_W = 16;
+/** Radius of the center color plate (also the inner ring's inner edge), in canvas px. */
+export const RING_CENTER_R = 20;
+/** Band width of BOTH rings (they touch — no gap between them), in canvas px. */
+export const RING_W = 18;
 
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
 export interface RingState {
@@ -480,7 +476,7 @@ export function renderRoundedBox(
   // Skipped while the triangle marker is active: the marker (a·C + b·W + g·K projection) lands
   // exactly on the pick dot (barycentric coords are preserved by the orthographic projection),
   // so the marker doubles as the position indicator for the current color.
-  if (dotVisible && !svMix) {
+  if (dotVisible && !svMix && !ring) {
     const dotPos = project3D(dotValues, scale, center, cam, box);
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
@@ -518,10 +514,10 @@ export function renderRoundedBox(
   if (ring && ring.reveal > 0.01) {
     const anchorPt = ring.anchor;
     const ease = ring.reveal < 0.5 ? 2 * ring.reveal * ring.reveal : 1 - Math.pow(-2 * ring.reveal + 2, 2) / 2;
-    const rIn = RING_INNER_R * ease;
-    const rOut = RING_OUTER_R * ease;
-    const wIn = RING_INNER_W * ease;
-    const wOut = RING_OUTER_W * ease;
+    const cR = RING_CENTER_R * ease;                      // center color-plate radius
+    const rIn = (RING_CENTER_R + RING_W / 2) * ease;      // alpha band center
+    const rOut = (RING_CENTER_R + RING_W * 1.5) * ease;   // sat band center
+    const wRing = RING_W * ease;                          // both bands share the same width
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
     const start = -Math.PI / 2; // 12 o'clock = 0%
@@ -587,7 +583,7 @@ export function renderRoundedBox(
       const col = ringColorAt(anchorRgb, i * segStep);
       overlayCtx.beginPath();
       overlayCtx.arc(anchorPt.x, anchorPt.y, rOut, a0, a0 + segStep + 0.012); // tiny overlap hides seam gaps
-      overlayCtx.lineWidth = wOut;
+      overlayCtx.lineWidth = wRing;
       overlayCtx.lineCap = 'butt';
       overlayCtx.strokeStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
       overlayCtx.stroke();
@@ -601,23 +597,48 @@ export function renderRoundedBox(
     overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
     overlayCtx.lineWidth = 1.4;
     overlayCtx.stroke();
-    bandEdges(rOut, wOut, ring.band === 'sat');
-    ringLabel('SAT', rOut, wOut, ring.band === 'sat');
+    bandEdges(rOut, wRing, ring.band === 'sat');
+    ringLabel('SAT', rOut, wRing, ring.band === 'sat');
 
     // Inner ring — ALPHA: checkerboard track (standard transparency-bar look in ring form);
     // the value arc is the color at its alpha over the checkerboard, so the arc itself shows
     // the exact result and the empty arc reads as fully transparent.
-    checkerBand(rIn, wIn);
+    checkerBand(rIn, wRing);
     const alphaEnd = start + alpha * Math.PI * 2;
     if (alpha > 0.001) {
       overlayCtx.beginPath();
       overlayCtx.arc(anchorPt.x, anchorPt.y, rIn, start, alphaEnd);
-      overlayCtx.lineWidth = wIn;
+      overlayCtx.lineWidth = wRing;
       overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`;
       overlayCtx.stroke();
     }
-    bandEdges(rIn, wIn, ring.band === 'alpha');
-    ringLabel('A', rIn, wIn, ring.band === 'alpha');
+    bandEdges(rIn, wRing, ring.band === 'alpha');
+
+    // Center plate — the current color itself (checkerboard shows through when alpha < 100%):
+    // a live swatch of exactly what the color looks like at its transparency.
+    overlayCtx.save();
+    overlayCtx.beginPath();
+    overlayCtx.arc(anchorPt.x, anchorPt.y, cR, 0, Math.PI * 2);
+    overlayCtx.clip();
+    if (alpha < 1) {
+      const cs = 6;
+      for (let gy = -cR; gy < cR; gy += cs) {
+        for (let gx = -cR; gx < cR; gx += cs) {
+          overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
+          overlayCtx.fillRect(anchorPt.x + gx, anchorPt.y + gy, cs, cs);
+        }
+      }
+    }
+    overlayCtx.fillStyle = alpha < 1
+      ? `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`
+      : `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+    overlayCtx.fillRect(anchorPt.x - cR, anchorPt.y - cR, cR * 2, cR * 2);
+    overlayCtx.restore();
+    overlayCtx.beginPath();
+    overlayCtx.arc(anchorPt.x, anchorPt.y, cR, 0, Math.PI * 2);
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    overlayCtx.lineWidth = 2;
+    overlayCtx.stroke();
 
     overlayCtx.restore();
   }

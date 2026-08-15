@@ -5,7 +5,7 @@ import type {
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle } from './camera-math';
 import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, ringColorAt } from './color-math';
-import { initWebGL, renderRoundedBox, RING_INNER_R, RING_INNER_W, RING_OUTER_R, RING_OUTER_W } from './rounded-renderer';
+import { initWebGL, renderRoundedBox, RING_CENTER_R, RING_W } from './rounded-renderer';
 
 export interface RoundedBoxOptions {
   initialColor?: RGBColor;
@@ -123,8 +123,12 @@ export function createRoundedBoxPicker(
   // Angular hysteresis: the pointer must rotate ~10° inside a band before that ring engages.
   // Reaching the outer ring passes THROUGH the inner band radially, which doesn't rotate the
   // pointer — so crossing never accidentally changes alpha; once engaged, fine rotation applies.
+  // The engaged ring LOCKS until release (rotating the sat ring swings its chord through the
+  // inner band, which must not steal the drag); crossing the center plate unlocks so the user
+  // can still switch rings mid-drag by dragging through the middle.
   let ringBandStartAngle = 0;
   let ringEngaged = false;
+  let ringLockedBand: 'sat' | 'alpha' | null = null;
   // The saturation ring is the C / white / black triangle perimeter wrapped into a circle:
   // top = anchor color, right = black, bottom = gray, left = white (hue preserved).
   let ringColorAnchor: Vec3 | null = null; // color captured at press (the ring's C vertex)
@@ -448,13 +452,22 @@ export function createRoundedBoxPicker(
       // Bands scale with the reveal animation; pointer distance picks the active ring
       // (inner = alpha, outer = saturation), switchable mid-drag.
       const eReveal = easeInOutQuad(ringReveal);
-      const rIn = RING_INNER_R * eReveal;
-      const rOut = RING_OUTER_R * eReveal;
-      const outBand = Math.abs(dist - rOut) <= (RING_OUTER_W * eReveal) / 2 + 2;
-      const inBand = Math.abs(dist - rIn) <= (RING_INNER_W * eReveal) / 2 + 2;
-      const band: 'alpha' | 'sat' | null = outBand ? 'sat' : inBand ? 'alpha' : null;
+      // Contiguous bands (no gap): inner [rC, rC+rW], outer [rC+rW, rC+2rW]
+      const rC = RING_CENTER_R * eReveal;
+      const rW = RING_W * eReveal;
+      const outBand = dist >= rC + rW - 2 && dist <= rC + 2 * rW + 2;
+      const inBand = dist >= rC - 2 && dist <= rC + rW + 2;
+      let band: 'alpha' | 'sat' | null;
+      if (dist < rC - 3) {
+        band = null; // in the center plate: no ring (unlocks the locked ring)
+      } else if (ringLockedBand) {
+        band = ringLockedBand;
+      } else {
+        band = outBand ? 'sat' : inBand ? 'alpha' : null;
+      }
       if (band !== ringBand) {
         ringBand = band;
+        if (band === null) ringLockedBand = null; // dragged through the center: free again
         ringBandStartAngle = band ? ringAngleAt(p) : 0;
         ringEngaged = false;
       }
@@ -463,7 +476,10 @@ export function createRoundedBoxPicker(
         if (!ringEngaged) {
           let delta = Math.abs(ang - ringBandStartAngle);
           if (delta > Math.PI) delta = TWO_PI - delta; // wrap-around
-          if (delta > 10 * DEG) ringEngaged = true;
+          if (delta > 10 * DEG) {
+            ringEngaged = true;
+            ringLockedBand = band;
+          }
         }
         if (ringEngaged) {
           if (band === 'alpha') setAlphaInternal(ang / TWO_PI);
@@ -498,6 +514,7 @@ export function createRoundedBoxPicker(
       ringBand = null;
       ringBandStartAngle = 0;
       ringEngaged = false;
+      ringLockedBand = null;
       ringColorAnchor = null;
       ringAngle = 0;
       animateRing(0);
