@@ -581,6 +581,25 @@ export function renderRoundedBox(
       overlayCtx.fillText(text, x, y);
     };
 
+    // Thumb knob (shared by both rings): a ring of the given color with a white core, a small
+    // color dot and a subtle dark outline — marks the current value position on a ring.
+    const thumbKnob = (x: number, y: number, col: { r: number; g: number; b: number }) => {
+      overlayCtx.beginPath();
+      overlayCtx.arc(x, y, 9, 0, Math.PI * 2);
+      overlayCtx.fillStyle = '#ffffff';
+      overlayCtx.fill();
+      overlayCtx.lineWidth = 4.5;
+      overlayCtx.strokeStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
+      overlayCtx.stroke();
+      overlayCtx.lineWidth = 1;
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+      overlayCtx.stroke();
+      overlayCtx.beginPath();
+      overlayCtx.arc(x, y, 3, 0, Math.PI * 2);
+      overlayCtx.fillStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
+      overlayCtx.fill();
+    };
+
     // INNER ring — SATURATION: a linear ramp like the classic saturation slider — black at
     // 12 o'clock, the anchor color at 6 o'clock, white back at 12 o'clock (hue preserved),
     // hugging the center color. Dragging around it sets the color to the ring color at the
@@ -599,15 +618,11 @@ export function renderRoundedBox(
       overlayCtx.strokeStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
       overlayCtx.stroke();
     }
+    // Thumb knob at the current saturation position (same style as the alpha ring's knob):
+    // a ring of the current color with a white core and a small color dot.
     const mkx = anchorPt.x + rSat * Math.sin(ring.angle);
     const mky = anchorPt.y - rSat * Math.cos(ring.angle);
-    overlayCtx.beginPath();
-    overlayCtx.arc(mkx, mky, 4, 0, Math.PI * 2);
-    overlayCtx.fillStyle = '#ffffff';
-    overlayCtx.fill();
-    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
-    overlayCtx.lineWidth = 1.4;
-    overlayCtx.stroke();
+    thumbKnob(mkx, mky, finalRgb);
     bandEdges(rSat, wRing, ring.band === 'sat');
 
     // OUTER ring — ALPHA: dotted track (the transparent indicator) with the value arc drawn
@@ -626,20 +641,7 @@ export function renderRoundedBox(
       // alphaEnd is a canvas angle (0 = 3 o'clock, y down), so x uses cos and y uses +sin.
       const kx = anchorPt.x + rAlp * Math.cos(alphaEnd);
       const ky = anchorPt.y + rAlp * Math.sin(alphaEnd);
-      overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 9, 0, Math.PI * 2);
-      overlayCtx.fillStyle = '#ffffff';
-      overlayCtx.fill();
-      overlayCtx.lineWidth = 4.5;
-      overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-      overlayCtx.stroke();
-      overlayCtx.lineWidth = 1;
-      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
-      overlayCtx.stroke();
-      overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 3, 0, Math.PI * 2);
-      overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-      overlayCtx.fill();
+      thumbKnob(kx, ky, finalRgb);
     }
     bandEdges(rAlp, wRing, ring.band === 'alpha');
     ringLabel('SAT', rAlp, ring.band === 'sat');

@@ -17,7 +17,8 @@ Tiny, framework-agnostic, works everywhere.
   **middle circle is the current color** (the enlarged pick indicator — translucent so the box
   shows through when semi-transparent),  surrounded by two **touching, equal-width rings**. **Inner = saturation** — a single linear
   ramp like a classic saturation slider: **black at 12 o'clock → the current color at 6 o'clock →
-  white back at 12 o'clock** (hue preserved, marker dot shows the position). **Outer = alpha** — a
+  white back at 12 o'clock** (hue preserved); a **thumb knob** (color ring + white core) shows the
+  position. **Outer = alpha** — a
   dotted track (the transparency indicator) filled SOLID up to the current value, with a thumb
   knob marking the value; the center plate shows the actual translucency. The rings unfold after
   holding the dot ~0.25 s (or immediately once you drag); the active ring follows the pointer, so
