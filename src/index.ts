@@ -3,7 +3,7 @@ import type {
   ColorOutput, ColorChangeCallback, GuideVisibility, EdgeStyleConfig, RoundedBoxColorPicker,
 } from './types';
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
-import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D } from './camera-math';
+import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, projectSaturationTriangle } from './camera-math';
 import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb } from './color-math';
 import { initWebGL, renderRoundedBox } from './rounded-renderer';
 
@@ -12,6 +12,25 @@ export interface RoundedBoxOptions {
   size?: number;
   mode?: ColorMode;
 }
+
+const DEG = Math.PI / 180;
+const TWO_PI = 2 * Math.PI;
+
+/** Wrap an angle to [-180, 180) (degrees) */
+const wrapDeg = (d: number): number => {
+  let m = d % 360;
+  if (m > 180) m -= 360;
+  else if (m < -180) m += 360;
+  return m;
+};
+
+/** Wrap radians to [-π, π) */
+const wrapRad = (r: number): number => {
+  let m = r % TWO_PI;
+  if (m > Math.PI) m -= TWO_PI;
+  else if (m < -Math.PI) m += TWO_PI;
+  return m;
+};
 
 export function createRoundedBoxPicker(
   container: HTMLElement,
@@ -26,18 +45,34 @@ export function createRoundedBoxPicker(
   let guides: GuideVisibility = { ...DEFAULT_GUIDES };
   let edgeStyle: EdgeStyleConfig = { ...DEFAULT_EDGE_CONFIG };
 
+  // Dual-matrix model (Blender viewport semantics):
+  // - objMat  the object's own orientation (driven by ROT sliders / setAxisRotation / presets); acc tracks only this
+  // - viewMat camera/viewport orientation (only middle-drag / empty-drag orbit changes it); slider values unaffected
+  // - cam.mat = viewMat · objMat (rendering / picking / guides all use the combined matrix)
+  const DEFAULT_ROT = { x: 8 * DEG, y: -20 * DEG, z: -55 * DEG };
+  let objMat: Mat3 = mat3FromEuler(DEFAULT_ROT.x, DEFAULT_ROT.y, DEFAULT_ROT.z);
+  let viewMat: Mat3 = mat3Identity();
+  let acc = { ...DEFAULT_ROT };
+
+  const syncCam = () => {
+    cam.mat = mat3Mul(viewMat, objMat);
+  };
+
   let color: RGBColor = options.initialColor || { r: 255, g: 255, b: 255 };
   let dotValues: Vec3 = rgbToValues(color, mode);
+  // Saturation triangle drag state: svAnchor is the color captured at drag start so the
+  // triangle geometry stays fixed while dragging (the mix is computed against it).
+  let isSVDrag = false;
+  let svAnchor: Vec3 | null = null;
 
   const listeners = new Set<ColorChangeCallback>();
   const rc = initWebGL(container, size);
 
   let animId: number | null = null;
   const scheduleRender = () => {
-    if (animId !== null) return;
-    animId = requestAnimationFrame(() => {
+    if (animId !== null) return;      animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor);
     });
   };
 
@@ -57,111 +92,107 @@ export function createRoundedBoxPicker(
     listeners.forEach(cb => cb(out));
   };
 
-  // ── Blender 3D Interaction & Circular Gimbal Rings ──
-  // 1. Left Mouse Drag on Yaw Ring (Blue circle) -> Rotate Yaw (cam.rotZRad)
-  // 2. Left Mouse Drag on Pitch Ring (Red circle) -> Rotate Pitch (cam.rotXRad)
-  // 3. Middle Mouse Drag (or Alt + Left Drag) -> Free 3D Viewport Tumble
-  // 4. Left Mouse Click on Box surface -> Pick color
-  // 5. Mouse Wheel -> Zoom (0.2x ~ 2.5x)
-  let isTumbling = false;
-  let isPicking = false;
-  let isDraggingYawRing = false;
-  let isDraggingPitchRing = false;
-  let startX = 0;
-  let startY = 0;
-  let startYaw = cam.rotZRad;
-  let startPitch = cam.rotXRad;
-
-  // Hit test for circular rings (Yaw & Pitch)
-  const hitTestRings = (clientX: number, clientY: number): 'yaw' | 'pitch' | null => {
-    if (!guides.angleGuides && !guides.yawArc && !guides.pitchArc) return null;
-    const rect = rc.canvasGL.getBoundingClientRect();
-    const px = (clientX - rect.left) * (rc.width / rect.width);
-    const py = (clientY - rect.top) * (rc.height / rect.height);
-    const scale = rc.width * 0.26;
-    const center: Vec2 = { x: rc.width * 0.5, y: rc.height * 0.5 };
-    const project = (p: Vec3) => project3D(p, scale, center, cam, box);
-
-    // 1. Check Yaw Ring (Z=0 plane circle)
-    const yawSegments = 36;
-    for (let i = 0; i < yawSegments; i++) {
-      const a = (i / yawSegments) * Math.PI * 2;
-      const pt3: Vec3 = { x: 0.5 + Math.cos(a) * 0.75, y: 0.5 + Math.sin(a) * 0.75, z: 0 };
-      const p2d = project(pt3);
-      if (Math.hypot(px - p2d.x, py - p2d.y) < 14) return 'yaw';
+  // ── Blender 3D Interaction ──
+  // 1. Middle Mouse Drag (or Alt+Left Drag, or Left Drag on EMPTY area) -> Free 3D Viewport Tumble
+  // 2. Left Mouse Click / Drag on Box surface -> Pick color
+  // 3. Mouse Wheel -> Zoom (0.2x ~ 2.5x)
+  // 4. Keyboard: R reset · F/B/T front/back/top view · Arrow keys nudge rotation
+  // 5. Double Click: on box = invert color · on empty = reset view
+  //
+  // All rotations pivot around the box's own local axes (post-multiply objMat):
+  // - Horizontal drag / ROT Z  -> around local Z (blue line stays)
+  // - Vertical drag / ROT X    -> around local X (red line stays)
+  // - ROT Y                    -> around local Y (green line stays)
+  // So each axis guide line stays fixed while rotating around its own axis.
+  const rotateLocal = (axis: 'x' | 'y' | 'z', deltaRad: number) => {
+    if (deltaRad === 0) return;
+    if (axis === 'x') {
+      objMat = mat3Mul(objMat, mat3RotX(deltaRad));
+      acc.x += deltaRad;
+    } else if (axis === 'y') {
+      objMat = mat3Mul(objMat, mat3RotY(deltaRad));
+      acc.y += deltaRad;
+    } else {
+      objMat = mat3Mul(objMat, mat3RotZ(deltaRad));
+      acc.z += deltaRad;
     }
-
-    // 2. Check Pitch Ring (Y=0.5 vertical circle)
-    const pitchSegments = 24;
-    for (let i = 0; i <= pitchSegments; i++) {
-      const a = -Math.PI / 2 + (i / pitchSegments) * Math.PI;
-      const pt3: Vec3 = { x: 0.5 + Math.cos(a) * 0.75, y: 0.5, z: 0.5 + Math.sin(a) * 0.75 };
-      const p2d = project(pt3);
-      if (Math.hypot(px - p2d.x, py - p2d.y) < 14) return 'pitch';
-    }
-
-    return null;
+    syncCam();
+    scheduleRender();
   };
 
-  // Exact 3D raycast to sample color at cursor
-  const pickColorAtScreen = (clientX: number, clientY: number) => {
+  // Camera orbit (Blender middle-drag / empty-area left-drag): only viewMat changes, object values stay.
+  // Horizontal = around the screen-vertical axis (world Y), vertical = around the screen-horizontal axis (world X).
+  const orbitView = (dx: number, dy: number) => {
+    viewMat = mat3Mul(mat3RotY(dx * 0.01), viewMat);
+    viewMat = mat3Mul(mat3RotX(-dy * 0.01), viewMat);
+    syncCam();
+    scheduleRender();
+  };
+
+  // Point the viewport at a desired combined orientation (object values unchanged): viewMat = desired · objMat⁻¹
+  const viewFrom = (combined: Mat3) => {
+    viewMat = mat3Mul(combined, mat3Transpose(objMat));
+    syncCam();
+    scheduleRender();
+  };
+
+  // Reset object orientation + viewport + zoom
+  const resetView = () => {
+    objMat = mat3FromEuler(DEFAULT_ROT.x, DEFAULT_ROT.y, DEFAULT_ROT.z);
+    viewMat = mat3Identity();
+    acc = { ...DEFAULT_ROT };
+    cam.zoom = 1.0;
+    syncCam();
+    scheduleRender();
+  };
+
+  let isTumbling = false;
+  let isPicking = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  // ── SDF helpers (shared by the raycast and the surface normal) ──
+  const boxHalf = (): Vec3 => ({ x: box.sizeX * 0.5, y: box.sizeY * 0.5, z: box.sizeZ * 0.5 });
+  const boxRad = (): number => {
+    const h = boxHalf();
+    return Math.min(box.radius || 0.001, Math.min(h.x, h.y, h.z) * 0.49);
+  };
+  const sdBox = (p: Vec3): number => {
+    const half = boxHalf();
+    const rad = boxRad();
+    const qx = Math.abs(p.x) - (half.x - rad);
+    const qy = Math.abs(p.y) - (half.y - rad);
+    const qz = Math.abs(p.z) - (half.z - rad);
+    const maxQx = Math.max(qx, 0.0);
+    const maxQy = Math.max(qy, 0.0);
+    const maxQz = Math.max(qz, 0.0);
+    const len = Math.hypot(maxQx, maxQy, maxQz);
+    const m = Math.min(Math.max(qx, Math.max(qy, qz)), 0.0);
+    return len + m - rad;
+  };
+  // Exact 3D raycast: returns the hit point in local box coords, or null (miss)
+  const raycastAt = (clientX: number, clientY: number): Vec3 | null => {
     const rect = rc.canvasGL.getBoundingClientRect();
     const px = (clientX - rect.left) * (rc.width / rect.width);
     const py = (clientY - rect.top) * (rc.height / rect.height);
-    
+
     const screenX = px - rc.width * 0.5;
     const screenY = rc.height * 0.5 - py; // Flip Y for WebGL matching
-    
-    const scaleFactor = rc.width * 0.26 * 1.6 * (cam.zoom || 1.0);
+
+    const scaleFactor = rc.width * 0.36 * 1.6 * (cam.zoom || 1.0);
     const camXY = { x: screenX / scaleFactor, y: screenY / scaleFactor };
-    
-    // Raymarching in local coordinate space
-    const halfSize = { x: box.sizeX * 0.5, y: box.sizeY * 0.5, z: box.sizeZ * 0.5 };
-    const minDim = Math.min(Math.min(halfSize.x, halfSize.y), halfSize.z);
-    const rad = Math.min(box.radius || 0.001, minDim * 0.49);
 
-    // Inverse rotation
-    const cx = Math.cos(cam.rotXRad), sx = Math.sin(cam.rotXRad);
-    const cy = Math.cos(cam.rotYRad), sy = Math.sin(cam.rotYRad);
-    const cz = Math.cos(cam.rotZRad), sz = Math.sin(cam.rotZRad);
-
-    const rotToLocal = (p: Vec3): Vec3 => {
-      const x2 =  p.x * cz + p.y * sz;
-      const y2 = -p.x * sz + p.y * cz;
-      const z2 =  p.z;
-
-      const x1 =  x2 * cy + z2 * sy;
-      const y1 =  y2;
-      const z1 = -x2 * sy + z2 * cy;
-
-      const x = x1;
-      const y =  y1 * cx + z1 * sx;
-      const z = -y1 * sx + z1 * cx;
-      return { x, y, z };
-    };
-
-    const sdBox = (p: Vec3): number => {
-      const qx = Math.abs(p.x) - (halfSize.x - rad);
-      const qy = Math.abs(p.y) - (halfSize.y - rad);
-      const qz = Math.abs(p.z) - (halfSize.z - rad);
-      const maxQx = Math.max(qx, 0.0);
-      const maxQy = Math.max(qy, 0.0);
-      const maxQz = Math.max(qz, 0.0);
-      const len = Math.hypot(maxQx, maxQy, maxQz);
-      const m = Math.min(Math.max(qx, Math.max(qy, qz)), 0.0);
-      return len + m - rad;
-    };
+    // Inverse transform: Cam space -> local space (inverse of a rotation matrix = transpose)
+    const rotToLocal = (p: Vec3): Vec3 => mat3Apply(mat3Transpose(cam.mat), p);
 
     let t = 0.0;
-    let hit = false;
-    let hitLocal: Vec3 = { x: 0, y: 0, z: 0 };
+    let hitLocal: Vec3 | null = null;
 
     for (let i = 0; i < 96; i++) {
       const pCam: Vec3 = { x: camXY.x, y: camXY.y, z: -5.0 + t };
       const pLoc = rotToLocal(pCam);
       const d = sdBox(pLoc);
       if (d < 0.001) {
-        hit = true;
         hitLocal = pLoc;
         break;
       }
@@ -169,58 +200,91 @@ export function createRoundedBoxPicker(
       if (t > 10.0) break;
     }
 
-    if (hit) {
-      // Map local coordinates [-halfSize, +halfSize] to normalized [0, 1]
-      const nx = Math.max(0, Math.min(1, hitLocal.x / box.sizeX + 0.5));
-      const ny = Math.max(0, Math.min(1, hitLocal.y / box.sizeY + 0.5));
-      const nz = Math.max(0, Math.min(1, hitLocal.z / box.sizeZ + 0.5));
-      dotValues = { x: nx, y: ny, z: nz };
-      notify();
-      scheduleRender();
-    }
+    return hitLocal;
   };
+
+  const pickColorAtScreen = (clientX: number, clientY: number) => {
+    const hit = raycastAt(clientX, clientY);
+    if (!hit) return;
+    // Map local coordinates [-halfSize, +halfSize] to normalized [0, 1]
+    const nx = Math.max(0, Math.min(1, hit.x / box.sizeX + 0.5));
+    const ny = Math.max(0, Math.min(1, hit.y / box.sizeY + 0.5));
+    const nz = Math.max(0, Math.min(1, hit.z / box.sizeZ + 0.5));
+    dotValues = { x: nx, y: ny, z: nz };
+    notify();
+    scheduleRender();
+  };
+
+  // Saturation triangle: barycentric weights (a,b,g) of the pointer inside the projected
+  // triangle (current color C / white W / black K), or null when outside / disabled.
+  // Orthographic projection preserves barycentric coordinates, so the screen mix equals the 3D mix.
+  const triangleBarycentric = (clientX: number, clientY: number): { a: number; b: number; g: number } | null => {
+    if (!guides.svTriangle) return null;
+    const rect = rc.canvasGL.getBoundingClientRect();
+    const px = (clientX - rect.left) * (rc.width / rect.width);
+    const py = (clientY - rect.top) * (rc.height / rect.height);
+    const tri = projectSaturationTriangle(svAnchor || dotValues, mode, rc.width * 0.36, { x: rc.width * 0.5, y: rc.height * 0.5 }, cam, box);
+    const denom = (tri.w.y - tri.k.y) * (tri.c.x - tri.k.x) + (tri.k.x - tri.w.x) * (tri.c.y - tri.k.y);
+    if (Math.abs(denom) < 1e-6) return null;
+    const a = ((tri.w.y - tri.k.y) * (px - tri.k.x) + (tri.k.x - tri.w.x) * (py - tri.k.y)) / denom;
+    const b = ((tri.k.y - tri.c.y) * (px - tri.k.x) + (tri.c.x - tri.k.x) * (py - tri.k.y)) / denom;
+    const g = 1 - a - b;
+    if (a < -0.02 || b < -0.02 || g < -0.02) return null;
+    return { a, b, g };
+  };
+
+  // Apply a triangle mix: new color = a·C + b·white + g·black (normalized RGB), same hue.
+  const applyTriangleMix = (w: { a: number; b: number; g: number }) => {
+    const anchor = svAnchor || dotValues;
+    const tri = projectSaturationTriangle(anchor, mode, rc.width * 0.36, { x: rc.width * 0.5, y: rc.height * 0.5 }, cam, box);
+    const nr = Math.max(0, Math.min(1, w.a * tri.cRGB.x + w.b));
+    const ng = Math.max(0, Math.min(1, w.a * tri.cRGB.y + w.b));
+    const nb = Math.max(0, Math.min(1, w.a * tri.cRGB.z + w.b));
+    dotValues = rgbToValues({ r: nr * 255, g: ng * 255, b: nb * 255 }, mode);
+    notify();
+    scheduleRender();
+  };
+
+  // Cursor feedback: default on the box (left-drag picks color), grab on empty area (left-drag orbits)
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+  const updateCursor = (clientX: number, clientY: number) => {
+    lastMouseX = clientX;
+    lastMouseY = clientY;
+    rc.canvasGL.style.cursor = raycastAt(clientX, clientY) ? 'default' : 'grab';
+  };
+
+  rc.canvasGL.addEventListener('mousemove', (e) => {
+    updateCursor(e.clientX, e.clientY);
+  });
 
   rc.canvasGL.addEventListener('mousedown', (e) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       // Middle Click (or Alt+Left Click) = Blender Viewport 3D Tumble
       isTumbling = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      startYaw = cam.rotZRad;
-      startPitch = cam.rotXRad;
+      lastX = e.clientX;
+      lastY = e.clientY;
       document.body.style.cursor = 'grabbing';
       e.preventDefault();
     } else if (e.button === 0) {
-      // Check if clicking on Yaw or Pitch circular gimbal rings
-      const ring = hitTestRings(e.clientX, e.clientY);
-      if (ring === 'yaw') {
-        isDraggingYawRing = true;
-        startX = e.clientX;
-        startYaw = cam.rotZRad;
-        document.body.style.cursor = 'ew-resize';
-      } else if (ring === 'pitch') {
-        isDraggingPitchRing = true;
-        startY = e.clientY;
-        startPitch = cam.rotXRad;
-        document.body.style.cursor = 'ns-resize';
-      } else {
-        // Left Click = Color Pick
+      const sv = triangleBarycentric(e.clientX, e.clientY);
+      if (sv) {
+        // Left Click / Drag INSIDE the saturation triangle = adjust saturation & brightness
+        // (priority over surface picking since the triangle overlays the cube)
+        isSVDrag = true;
+        svAnchor = { ...dotValues };
+        applyTriangleMix(sv);
+      } else if (raycastAt(e.clientX, e.clientY)) {
+        // Left Click / Drag on Box surface = Color Pick
         isPicking = true;
         pickColorAtScreen(e.clientX, e.clientY);
-      }
-    }
-  });
-
-  // Hover cursor indicator for rings
-  rc.canvasGL.addEventListener('mousemove', (e) => {
-    if (!isTumbling && !isPicking && !isDraggingYawRing && !isDraggingPitchRing) {
-      const ring = hitTestRings(e.clientX, e.clientY);
-      if (ring === 'yaw') {
-        rc.canvasGL.style.cursor = 'ew-resize';
-      } else if (ring === 'pitch') {
-        rc.canvasGL.style.cursor = 'ns-resize';
       } else {
-        rc.canvasGL.style.cursor = 'default';
+        // Left Click / Drag on EMPTY area = Tumble (view orbit)
+        isTumbling = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        document.body.style.cursor = 'grabbing';
+        e.preventDefault();
       }
     }
   });
@@ -231,35 +295,34 @@ export function createRoundedBoxPicker(
   });
 
   window.addEventListener('mousemove', (e) => {
-    if (isTumbling) {
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      cam.rotZRad = startYaw + dx * 0.01;
-      cam.rotXRad = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, startPitch - dy * 0.01));
-      scheduleRender();
-    } else if (isDraggingYawRing) {
-      const dx = e.clientX - startX;
-      cam.rotZRad = startYaw + dx * 0.015;
-      scheduleRender();
-    } else if (isDraggingPitchRing) {
-      const dy = e.clientY - startY;
-      cam.rotXRad = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, startPitch - dy * 0.015));
-      scheduleRender();
+    if (isSVDrag) {
+      const sv = triangleBarycentric(e.clientX, e.clientY);
+      if (sv) applyTriangleMix(sv);
+    } else if (isTumbling) {
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      // Camera orbit: only the viewport turns, object rotation values stay (Blender semantics)
+      orbitView(dx, dy);
     } else if (isPicking) {
       pickColorAtScreen(e.clientX, e.clientY);
     }
   });
 
   window.addEventListener('mouseup', () => {
-    if (isTumbling || isDraggingYawRing || isDraggingPitchRing) {
+    if (isSVDrag) {
+      isSVDrag = false;
+      svAnchor = null;
+    }
+    if (isTumbling) {
       isTumbling = false;
-      isDraggingYawRing = false;
-      isDraggingPitchRing = false;
       document.body.style.cursor = 'default';
     }
     if (isPicking) {
       isPicking = false;
     }
+    updateCursor(lastMouseX, lastMouseY);
   });
 
   // Mouse Wheel to Zoom (like Blender 3D)
@@ -270,11 +333,57 @@ export function createRoundedBoxPicker(
     scheduleRender();
   }, { passive: false });
 
-  rc.canvasGL.addEventListener('dblclick', () => {
-    invert = !invert;
-    notify();
+  // Double Click: on box = invert color (white <-> black); on empty = reset view
+  rc.canvasGL.addEventListener('dblclick', (e) => {
+    if (raycastAt(e.clientX, e.clientY)) {
+      invert = !invert;
+      notify();
+    } else {
+      resetView();
+    }
     scheduleRender();
   });
+
+  // Keyboard shortcuts: R reset · F front · B back · T top · Arrow keys nudge rotation
+  const onKeyDown = (e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return; // do not intercept while typing values
+    switch (e.key) {
+      case 'r':
+      case 'R':
+        resetView();
+        break;
+      case 'f':
+      case 'F':
+        viewFrom(mat3Identity());
+        break;
+      case 'b':
+      case 'B':
+        viewFrom(mat3RotY(Math.PI));
+        break;
+      case 't':
+      case 'T':
+        viewFrom(mat3RotX(Math.PI / 2));
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        rotateLocal('y', -5 * DEG);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        rotateLocal('y', 5 * DEG);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        rotateLocal('x', 5 * DEG);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        rotateLocal('x', -5 * DEG);
+        break;
+    }
+  };
+  window.addEventListener('keydown', onKeyDown);
 
   scheduleRender();
   notify();
@@ -304,19 +413,37 @@ export function createRoundedBoxPicker(
     },
     getMode: () => mode,
     setRotation: (yawDeg: number, pitchDeg: number) => {
-      cam.rotZRad = (yawDeg * Math.PI) / 180;
-      cam.rotXRad = (pitchDeg * Math.PI) / 180;
+      // Legacy API compatibility: reset object orientation and viewport (Y axis 0 deg)
+      objMat = mat3FromEuler(pitchDeg * DEG, 0, yawDeg * DEG);
+      viewMat = mat3Identity();
+      acc.x = pitchDeg * DEG;
+      acc.y = 0;
+      acc.z = yawDeg * DEG;
+      syncCam();
       scheduleRender();
     },
     getAxisRotation: () => ({
-      rotXDeg: Math.round((cam.rotXRad * 180 / Math.PI) * 10) / 10,
-      rotYDeg: Math.round((cam.rotYRad * 180 / Math.PI) * 10) / 10,
-      rotZDeg: Math.round((cam.rotZRad * 180 / Math.PI) * 10) / 10,
+      rotXDeg: Math.round(wrapDeg(acc.x * 180 / Math.PI) * 10) / 10,
+      rotYDeg: Math.round(wrapDeg(acc.y * 180 / Math.PI) * 10) / 10,
+      rotZDeg: Math.round(wrapDeg(acc.z * 180 / Math.PI) * 10) / 10,
     }),
     setAxisRotation: (xDeg: number, yDeg: number, zDeg: number) => {
-      cam.rotXRad = (xDeg * Math.PI) / 180;
-      cam.rotYRad = (yDeg * Math.PI) / 180;
-      cam.rotZRad = (zDeg * Math.PI) / 180;
+      // Blender sidebar semantics: set the accumulated angle to the target; delta takes the shortest path (no long way around ±180)
+      rotateLocal('x', wrapRad(xDeg * DEG - acc.x));
+      rotateLocal('y', wrapRad(yDeg * DEG - acc.y));
+      rotateLocal('z', wrapRad(zDeg * DEG - acc.z));
+    },
+    rotateLocal: (axis: 'x' | 'y' | 'z', deltaDeg: number) => {
+      rotateLocal(axis, deltaDeg * DEG);
+    },
+    resetRotation: (xDeg: number, yDeg: number, zDeg: number) => {
+      // Absolute reset: object orientation + viewport together (matches default view)
+      objMat = mat3FromEuler(xDeg * DEG, yDeg * DEG, zDeg * DEG);
+      viewMat = mat3Identity();
+      acc.x = xDeg * DEG;
+      acc.y = yDeg * DEG;
+      acc.z = zDeg * DEG;
+      syncCam();
       scheduleRender();
     },
     setZoom: (z: number) => {
@@ -367,6 +494,7 @@ export function createRoundedBoxPicker(
     },
     destroy: () => {
       if (animId !== null) cancelAnimationFrame(animId);
+      window.removeEventListener('keydown', onKeyDown);
       container.innerHTML = '';
     },
   };

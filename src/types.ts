@@ -47,16 +47,16 @@ export interface AxisLock {
 }
 
 export interface EdgeStyleConfig {
-  showFront: boolean;      // 显示前侧可见边（Front Edges）
-  showBack: boolean;       // 显示后侧被遮挡暗边（Back / Hidden Edges 透视线）
-  frontWidth: number;      // 前侧边线粗细 (px)
-  backWidth: number;       // 后侧边线粗细 (px)
-  frontDashed: boolean;    // 前侧边线是否虚线
-  backDashed: boolean;     // 后侧边线是否虚线
-  frontColor: string;      // 前侧边线颜色
-  backColor: string;       // 后侧边线颜色
-  frontOpacity: number;    // 前侧边透明度 0..1
-  backOpacity: number;     // 后侧边透明度 0..1
+  showFront: boolean;      // Show visible front edges
+  showBack: boolean;       // Show hidden back edges (wireframe)
+  frontWidth: number;      // Front edge line width (px)
+  backWidth: number;       // Back edge line width (px)
+  frontDashed: boolean;    // Whether front edges are dashed
+  backDashed: boolean;     // Whether back edges are dashed
+  frontColor: string;      // Front edge color
+  backColor: string;       // Back edge color
+  frontOpacity: number;    // Front edge opacity 0..1
+  backOpacity: number;     // Back edge opacity 0..1
 }
 
 export const DEFAULT_EDGE_CONFIG: EdgeStyleConfig = {
@@ -80,6 +80,8 @@ export interface GuideVisibility {
   centerY: boolean;
   centerZ: boolean;
   angleGuides: boolean;
+  /** Saturation triangle overlay (current color / white / black), draggable to adjust saturation & brightness */
+  svTriangle: boolean;
 }
 
 export const DEFAULT_GUIDES: GuideVisibility = {
@@ -90,6 +92,7 @@ export const DEFAULT_GUIDES: GuideVisibility = {
   centerY: true,
   centerZ: true,
   angleGuides: true,
+  svTriangle: true,
 };
 
 export const AXIS_LABELS: Record<ColorMode, [string, string, string]> = {
@@ -113,7 +116,15 @@ export interface RoundedBoxColorPicker {
   getMode(): ColorMode;
   setRotation(yawDeg: number, pitchDeg: number): void;
   getAxisRotation(): { rotXDeg: number; rotYDeg: number; rotZDeg: number };
+  /**
+   * Set the accumulated rotation angle per axis (Blender sidebar semantics): rotate around each local axis by a delta.
+   * When changing a single axis, that axis guide line stays fixed.
+   */
   setAxisRotation(xDeg: number, yDeg: number, zDeg: number): void;
+  /** Rotate around the box's current local axis by a delta (axis guide stays fixed, box rotates around it) */
+  rotateLocal(axis: 'x' | 'y' | 'z', deltaDeg: number): void;
+  /** Absolute orientation reset (rebuild matrix via Euler order X -> Z -> Y), used by presets to restore the default view */
+  resetRotation(xDeg: number, yDeg: number, zDeg: number): void;
   setZoom(z: number): void;
   getZoom(): number;
   setDimensions(x: number, y: number, z: number): void;

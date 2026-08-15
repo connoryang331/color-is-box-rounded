@@ -69,13 +69,125 @@
   .panel-info.hidden-panel {
     display: none !important;
   }
-  #current-card { position: fixed; right: 24px; bottom: 24px; }
+  #current-card { position: fixed; right: 24px; bottom: 24px; z-index: 1001; max-height: calc(100vh - 110px); overflow-y: auto; scrollbar-width: thin; }
   #how-card { position: fixed; left: 24px; bottom: 24px; }
   h3 { margin: 0 0 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-h3); }
   .rows { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .row { display: flex; align-items: center; padding: 7px 0; }
   .row .label { font-size: 12px; font-weight: 600; color: var(--text-label); letter-spacing: .01em; width: 62px; flex-shrink: 0; }
   .row .val { font: 12.5px/1.5 ui-monospace, "SF Mono", "Cascadia Code", monospace; color: var(--text-val); letter-spacing: .01em; text-align: left; margin-left: 0; flex: 1; }
+
+  /* Blender-style numeric slider */
+  .blender-slider {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 155px;
+    height: 26px;
+    background: var(--bg-slider);
+    border: 1px solid var(--border-slider);
+    border-radius: 5px;
+    overflow: hidden;
+    cursor: ew-resize;
+    user-select: none;
+    box-shadow: var(--shadow-slider);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .blender-slider:hover {
+    border-color: var(--border-slider-hover);
+  }
+  .blender-slider .bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    opacity: 0.18;
+    pointer-events: none;
+    transition: width 0.04s linear;
+  }
+  .blender-slider.rot-x .bar { background: #ef4444; opacity: 0.22; }
+  .blender-slider.rot-y .bar { background: #22c55e; opacity: 0.22; }
+  .blender-slider.rot-z .bar { background: #3b82f6; opacity: 0.22; }
+  .blender-slider input {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    text-align: center;
+    font: 12px/26px ui-monospace, "SF Mono", monospace;
+    font-weight: 600;
+    color: var(--text-slider);
+    cursor: ew-resize;
+    padding: 0 4px;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+  .blender-slider.typing input,
+  .blender-slider input:focus {
+    background: var(--bg-slider);
+    color: var(--text-val);
+    cursor: text;
+    border: 1px solid #3b82f6;
+    pointer-events: auto;
+  }
+
+  .guides-panel {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-dashed);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .guide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .guide-header span {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-label);
+  }
+  .btn-all-group {
+    display: flex;
+    gap: 4px;
+  }
+  .guide-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .guide-toggle-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-body);
+    cursor: pointer;
+    user-select: none;
+  }
+  .guide-toggle-item input[type="checkbox"] {
+    accent-color: #007AFF;
+    cursor: pointer;
+    margin: 0;
+  }
+  .guide-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .guide-dot.red { background: #ef4444; }
+  .guide-dot.green { background: #22c55e; }
+  .guide-dot.blue { background: #3b82f6; }
 
   /* Preset Icon Buttons (Cube / Cuboid) */
   .btn-preset {
@@ -170,6 +282,27 @@
     background: var(--bg-btn-hover);
     color: var(--text-val);
   }
+  .btn-mini-icon.copied {
+    background: #22c55e;
+    border-color: #22c55e;
+    color: #ffffff;
+  }
+
+  /* Parameter Card Header: Title + Copy Actions */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .panel-header h3 {
+    margin: 0;
+  }
+  .copy-actions {
+    display: flex;
+    gap: 4px;
+  }
   /* Pure Zen Mode (Hide all UI except 3D Cube Canvas) */
   body.zen-mode .top-navbar,
   body.zen-mode #current-card,
@@ -224,13 +357,12 @@
   <div class="top-navbar">
     <div class="app-brand">Color Is Box Rounded</div>
     <div class="top-action-bar">
-      <button id="panels-toggle" class="action-btn" title="Toggle Side Panels">
+      <button id="panels-toggle" class="action-btn icon-only" title="Toggle Side Panels">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
           <line x1="9" y1="3" x2="9" y2="21"></line>
           <line x1="15" y1="3" x2="15" y2="21"></line>
         </svg>
-        <span id="panels-toggle-text">Hide Panels</span>
       </button>
       <button id="theme-toggle" class="action-btn icon-only" title="Toggle Dark / Light Theme">
         <svg id="theme-icon-sun" style="display: none;" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -252,32 +384,42 @@
   </div>
 
   <div class="panel-info" id="current-card" style="width: 320px;">
-    <h3>Transform & Guides</h3>
+    <div class="panel-header">
+      <h3>Transform & Guides</h3>
+      <div class="copy-actions">
+        <button class="btn-mini-icon" id="btn-copy-text" title="Copy parameters as text">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+        <button class="btn-mini-icon" id="btn-copy-json" title="Copy parameters as JSON">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h3"></path><path d="M16 3h3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-3"></path></svg>
+        </button>
+      </div>
+    </div>
     <div class="rows">
       <!-- 3D Rotation Controls -->
       <div class="row" style="padding-top: 0;">
         <span class="label" style="color: #ef4444;">ROT X</span>
         <div class="blender-slider rot-x" id="slider-rot-x">
           <div class="bar"></div>
-          <input type="text" id="v-rot-x" value="20.0°">
+          <input type="text" id="v-rot-x" value="8.0°">
         </div>
       </div>
       <div class="row">
         <span class="label" style="color: #22c55e;">ROT Y</span>
         <div class="blender-slider rot-y" id="slider-rot-y">
           <div class="bar"></div>
-          <input type="text" id="v-rot-y" value="0.0°">
+          <input type="text" id="v-rot-y" value="-20.0°">
         </div>
       </div>
       <div class="row">
         <span class="label" style="color: #3b82f6;">ROT Z</span>
         <div class="blender-slider rot-z" id="slider-rot-z">
           <div class="bar"></div>
-          <input type="text" id="v-rot-z" value="-30.0°">
+          <input type="text" id="v-rot-z" value="-55.0°">
         </div>
       </div>
 
-      <!-- 3D Box Dimensions (长方体三轴独立拉伸、视角缩放与倒角控制) -->
+      <!-- 3D Box Dimensions (independent per-axis stretch, view zoom & bevel control) -->
       <div class="row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--border-dashed);">
         <span class="label" style="color: #ef4444;">SIZE X</span>
         <div class="blender-slider rot-x" id="slider-size-x">
@@ -317,21 +459,19 @@
 
       <!-- Quick Preset Icon Buttons (Cube / Cuboid) -->
       <div style="margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <button id="btn-preset-cube" class="btn-preset">
+        <button id="btn-preset-cube" class="btn-preset" title="Reset to Cube">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
             <line x1="12" y1="22.08" x2="12" y2="12"/>
           </svg>
-          Cube
         </button>
-        <button id="btn-preset-cuboid" class="btn-preset">
+        <button id="btn-preset-cuboid" class="btn-preset" title="Set Cuboid Shape">
           <svg viewBox="0 0 24 24" width="16" height="15" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 14.5V9.5a1.5 1.5 0 0 0-.75-1.3l-9-4.2a1.5 1.5 0 0 0-1.5 0l-9 4.2A1.5 1.5 0 0 0 1 9.5v5a1.5 1.5 0 0 0 .75 1.3l9 4.2a1.5 1.5 0 0 0 1.5 0l9-4.2a1.5 1.5 0 0 0 .75-1.3z"/>
             <polyline points="1.5 9 11.5 13.5 21.5 9"/>
             <line x1="11.5" y1="20" x2="11.5" y2="13.5"/>
           </svg>
-          Cuboid
         </button>
       </div>
 
@@ -355,13 +495,10 @@
           </div>
         </div>
         <div class="guide-grid">
-          <label class="guide-toggle-item"><input type="checkbox" id="g-vx" checked><span class="guide-dot red"></span> Vertex X</label>
           <label class="guide-toggle-item"><input type="checkbox" id="g-cx" checked><span class="guide-dot red"></span> Center X</label>
-          <label class="guide-toggle-item"><input type="checkbox" id="g-vy" checked><span class="guide-dot green"></span> Vertex Y</label>
           <label class="guide-toggle-item"><input type="checkbox" id="g-cy" checked><span class="guide-dot green"></span> Center Y</label>
-          <label class="guide-toggle-item"><input type="checkbox" id="g-vz" checked><span class="guide-dot blue"></span> Vertex Z</label>
           <label class="guide-toggle-item"><input type="checkbox" id="g-cz" checked><span class="guide-dot blue"></span> Center Z</label>
-          <label class="guide-toggle-item" style="grid-column: span 2;"><input type="checkbox" id="g-angles" checked>📐 Yaw & Pitch Angles</label>
+          <label class="guide-toggle-item"><input type="checkbox" id="g-sv" checked><span style="width:6px;height:6px;display:inline-block;background:transparent;border-left:3px solid transparent;border-right:3px solid transparent;border-bottom:6px solid #f59e0b;"></span> SV Triangle</label>
         </div>
       </div>
 
@@ -370,13 +507,29 @@
         <div class="guide-header">
           <span>12 Cube Edges</span>
           <div class="btn-all-group">
-            <button class="btn-mini" id="btn-toggle-front" title="Toggle Front Edges">Front</button>
-            <button class="btn-mini" id="btn-toggle-back" title="Toggle Back Edges">Back</button>
-            <button class="btn-mini" id="btn-toggle-edges" title="Toggle All Edges">All</button>
+            <button class="btn-mini-icon" id="btn-toggle-front" title="Toggle Front Edges">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+            </button>
+            <button class="btn-mini-icon" id="btn-toggle-back" title="Toggle Back Edges (Wireframe)">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke-dasharray="2 2"></path>
+              </svg>
+            </button>
+            <button class="btn-mini-icon" id="btn-toggle-edges" title="Toggle All 12 Edges">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+            </button>
           </div>
         </div>
         
-        <!-- Front Edges (前侧可见边) -->
+        <!-- Front Edges (visible) -->
         <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 4px 0 2px 0;">Front Edges (Visible)</div>
         <div class="guide-grid" style="margin-bottom: 4px;">
           <label class="guide-toggle-item"><input type="checkbox" id="ef-vis" checked>Show Front</label>
@@ -390,7 +543,7 @@
           </div>
         </div>
 
-        <!-- Back / Hidden Edges (后侧暗部透视边) -->
+        <!-- Back / Hidden Edges -->
         <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 8px 0 2px 0; padding-top: 4px; border-top: 1px dashed var(--border-dashed);">Back Edges (Hidden / Wireframe)</div>
         <div class="guide-grid" style="margin-bottom: 4px;">
           <label class="guide-toggle-item"><input type="checkbox" id="eb-vis" checked>Show Back</label>
@@ -445,17 +598,18 @@
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
       </svg>
-      <span id="zen-toggle-text">Zen View</span>
     </button>
   </div>
 
   <div class="panel-info" id="how-card">
     <h3>Blender 3D Controls</h3>
     <ul class="tips" style="padding-left: 16px; margin: 0; font-size: 11px; line-height: 1.6; color: var(--text-body);">
-      <li><b>Left Click / Drag (左键点击/拖拽)</b>: 在 3D 倒角几何体表面取色并移动拾色指示器</li>
-      <li><b>Middle Mouse Drag (鼠标中键拖拽 / Alt+左键)</b>: 3D 自由空间无极 360° 视口旋转 (Blender 3D 规范)</li>
-      <li><b>Mouse Wheel (滚轮)</b>: 3D 视口平滑缩放 (0.2x ~ 2.5x)</li>
-      <li><b>Double Click (双击)</b>: 快速反转色彩空间 (白 ↔ 黑)</li>
+      <li><b>Left Click / Drag</b>: pick color on the box surface &amp; move the picker dot; drag on <b>empty area</b> to orbit the view (grab cursor)</li>
+      <li><b>SV Triangle</b>: drag inside the color / white / black triangle to lighten, darken, or desaturate the current hue</li>
+      <li><b>Middle / Alt+Left Drag</b>: free 360° viewport orbit (Blender 3D style)</li>
+      <li><b>Mouse Wheel</b>: smooth viewport zoom (0.2x ~ 2.5x)</li>
+      <li><b>Double Click</b>: on box = invert color (white ↔ black); on empty = reset view</li>
+      <li><b>Keyboard</b>: R reset · F front view · B back view · T top view · Arrow keys nudge rotation (5° / step)</li>
     </ul>
   </div>
 
@@ -485,15 +639,56 @@
     picker.on('change', show);
     show(picker.getColor());
 
+    // ── Remember the last parameters as the default (restored on every load) ──
+    const PARAMS_KEY = 'color-is-box-rounded:params';
+    const snapshotParams = () => {
+      const rot = picker.getAxisRotation();
+      const dim = picker.getDimensions();
+      const col = picker.getColor();
+      return JSON.stringify({
+        rotX: rot.rotXDeg, rotY: rot.rotYDeg, rotZ: rot.rotZDeg,
+        sizeX: dim.sizeX, sizeY: dim.sizeY, sizeZ: dim.sizeZ,
+        zoom: Math.round(picker.getZoom() * 100) / 100,
+        radius: Math.round(picker.getRadius() * 1000) / 1000,
+        mode: picker.getMode(),
+        hex: col.hex,
+      });
+    };
+    const restoreParams = () => {
+      let p;
+      try { p = JSON.parse(localStorage.getItem(PARAMS_KEY)); } catch (e) { return; }
+      if (!p || typeof p !== 'object') return;
+      try {
+        if (typeof p.mode === 'string' && p.mode !== picker.getMode()) picker.setMode(p.mode);
+        if (typeof p.hex === 'string' && /^#[0-9a-f]{6}$/i.test(p.hex)) {
+          const h = p.hex.replace('#', '');
+          picker.setColor({ r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) });
+        }
+        if (typeof p.rotX === 'number') picker.setAxisRotation(p.rotX, p.rotY, p.rotZ);
+        if (typeof p.sizeX === 'number') picker.setDimensions(p.sizeX, p.sizeY, p.sizeZ);
+        if (typeof p.zoom === 'number') picker.setZoom(p.zoom);
+        if (typeof p.radius === 'number') picker.setRadius(p.radius);
+      } catch (e) { /* ignore malformed storage */ }
+    };
+    restoreParams();
+    let lastParams = snapshotParams();
+    let saveParamsTimer = null;
+    const maybeSaveParams = () => {
+      const s = snapshotParams();
+      if (s === lastParams) return;
+      lastParams = s;
+      clearTimeout(saveParamsTimer);
+      saveParamsTimer = setTimeout(() => {
+        try { localStorage.setItem(PARAMS_KEY, s); } catch (e) { /* ignore */ }
+      }, 400);
+    };
+
     // Guide switches
     const guideCheckboxes = {
-      vertexX: document.getElementById('g-vx'),
-      vertexY: document.getElementById('g-vy'),
-      vertexZ: document.getElementById('g-vz'),
       centerX: document.getElementById('g-cx'),
       centerY: document.getElementById('g-cy'),
       centerZ: document.getElementById('g-cz'),
-      angleGuides: document.getElementById('g-angles'),
+      svTriangle: document.getElementById('g-sv'),
     };
 
     Object.entries(guideCheckboxes).forEach(([key, el]) => {
@@ -633,7 +828,7 @@
     const sEfW = makeGenericSlider('slider-ef-w', 'v-ef-w', () => picker.getEdgeStyle ? picker.getEdgeStyle().frontWidth : 1.5, (w) => { if (picker.setEdgeStyle) picker.setEdgeStyle({ frontWidth: w }); }, 0.5, 8.0, 'px', 1);
     const sEbW = makeGenericSlider('slider-eb-w', 'v-eb-w', () => picker.getEdgeStyle ? picker.getEdgeStyle().backWidth : 1.0, (w) => { if (picker.setEdgeStyle) picker.setEdgeStyle({ backWidth: w }); }, 0.5, 8.0, 'px', 1);
 
-    // ── Rotation Sliders ──
+    // ── Rotation Sliders (display normalized to ±180°, shortest-path deltas) ──
     const initBlenderSlider = (sliderId, inputId, axis, minVal, maxVal) => {
       const slider = document.getElementById(sliderId);
       const input = document.getElementById(inputId);
@@ -643,12 +838,20 @@
       let startVal = 0;
       let hasMoved = false;
 
+      const wrapDeg = (v) => {
+        let m = v % 360;
+        if (m > 180) m -= 360;
+        else if (m < -180) m += 360;
+        return m;
+      };
+
       const getVal = () => {
         const rot = picker.getAxisRotation();
         return axis === 'x' ? rot.rotXDeg : axis === 'y' ? rot.rotYDeg : rot.rotZDeg;
       };
 
       const setVal = (val) => {
+        // Set the target value on the picker (API rotates around the local axis via the shortest path, keeping the axis guide fixed)
         const rot = picker.getAxisRotation();
         const rx = axis === 'x' ? val : rot.rotXDeg;
         const ry = axis === 'y' ? val : rot.rotYDeg;
@@ -677,7 +880,7 @@
         if (Math.abs(dx) > 0) {
           hasMoved = true;
           const speed = e.shiftKey ? 0.1 : 0.6;
-          const newVal = Math.round((startVal + dx * speed) * 10) / 10;
+          const newVal = Math.round(wrapDeg(startVal + dx * speed) * 10) / 10;
           setVal(newVal);
           input.value = newVal.toFixed(1) + '°';
           updateBar(newVal);
@@ -699,7 +902,7 @@
 
       input.addEventListener('blur', () => {
         slider.classList.remove('typing');
-        const v = parseFloat(input.value) || 0;
+        const v = Math.round(wrapDeg(parseFloat(input.value) || 0) * 10) / 10;
         setVal(v);
         input.value = v.toFixed(1) + '°';
         updateBar(v);
@@ -737,7 +940,7 @@
       picker.setDimensions(d.sizeX, d.sizeY, v);
     }, 0.2, 2.5, '', 2);
 
-    // RADIUS 百分比滑块 (0% 为直角立方体，100% 为完整 3D 倒角球体/胶囊体)
+    // RADIUS percentage slider (0% = sharp cube, 100% = fully beveled sphere/capsule)
     const sRadius = makeGenericSlider(
       'slider-radius',
       'v-radius',
@@ -757,7 +960,7 @@
 
     // Presets
     document.getElementById('btn-preset-cube').addEventListener('click', () => {
-      picker.setAxisRotation(20, 0, -30);
+      picker.resetRotation(8, -20, -55);
       picker.setZoom(1.0);
       picker.setDimensions(1.0, 1.0, 1.0);
       picker.setRadius(0.08);
@@ -772,7 +975,7 @@
     });
 
     document.getElementById('btn-preset-cuboid').addEventListener('click', () => {
-      picker.setAxisRotation(25, 0, -45);
+      picker.resetRotation(25, 0, -45);
       picker.setZoom(1.0);
       picker.setDimensions(1.5, 0.7, 1.0);
       picker.setRadius(0.06);
@@ -808,30 +1011,84 @@
 
     // ── Toggle Side Panels (How-to & Settings) ──
     const btnPanels = document.getElementById('panels-toggle');
-    const panelsText = document.getElementById('panels-toggle-text');
     const cardCurrent = document.getElementById('current-card');
     const cardHow = document.getElementById('how-card');
 
     let panelsVisible = true;
     btnPanels.addEventListener('click', () => {
       panelsVisible = !panelsVisible;
-      if (panelsVisible) {
-        cardCurrent.classList.remove('hidden-panel');
-        cardHow.classList.remove('hidden-panel');
-        panelsText.textContent = 'Hide Panels';
-      } else {
-        cardCurrent.classList.add('hidden-panel');
-        cardHow.classList.add('hidden-panel');
-        panelsText.textContent = 'Show Panels';
-      }
+      cardCurrent.classList.toggle('hidden-panel', !panelsVisible);
+      cardHow.classList.toggle('hidden-panel', !panelsVisible);
     });
 
     // ── Pure Zen Mode Toggle (Hide All UI & Focus purely on 3D Box) ──
     const btnZen = document.getElementById('zen-toggle');
-    const zenText = document.getElementById('zen-toggle-text');
     btnZen.addEventListener('click', () => {
-      const isZen = document.body.classList.toggle('zen-mode');
-      zenText.textContent = isZen ? 'Exit Zen' : 'Zen View';
+      document.body.classList.toggle('zen-mode');
+    });
+
+    // ── Copy Parameters (text / JSON) ──
+    const copyToClipboard = (text) => {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+      }
+      // Fallback for file:// pages without the async clipboard API
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return Promise.resolve();
+    };
+
+    const collectParams = () => {
+      const rot = picker.getAxisRotation();
+      const dim = picker.getDimensions();
+      const col = picker.getColor();
+      return {
+        rotX: rot.rotXDeg,
+        rotY: rot.rotYDeg,
+        rotZ: rot.rotZDeg,
+        sizeX: dim.sizeX,
+        sizeY: dim.sizeY,
+        sizeZ: dim.sizeZ,
+        zoom: Math.round(picker.getZoom() * 100) / 100,
+        radius: Math.round(picker.getRadius() * 1000) / 1000,
+        mode: picker.getMode(),
+        hex: col.hex,
+        rgb: { r: col.rgb.r, g: col.rgb.g, b: col.rgb.b },
+      };
+    };
+
+    const formatParamsText = (p) => [
+      `ROT X: ${p.rotX}°`,
+      `ROT Y: ${p.rotY}°`,
+      `ROT Z: ${p.rotZ}°`,
+      `SIZE X: ${p.sizeX}`,
+      `SIZE Y: ${p.sizeY}`,
+      `SIZE Z: ${p.sizeZ}`,
+      `ZOOM: ${p.zoom}x`,
+      `RADIUS: ${Math.round((p.radius / 0.50) * 100)}%`,
+      `MODE: ${p.mode.toUpperCase()}`,
+      `HEX: ${p.hex}`,
+      `RGB: ${p.rgb.r}, ${p.rgb.g}, ${p.rgb.b}`,
+    ].join('\n');
+
+    const flashCopied = (btn) => {
+      btn.classList.add('copied');
+      setTimeout(() => btn.classList.remove('copied'), 900);
+    };
+
+    document.getElementById('btn-copy-text').addEventListener('click', (e) => {
+      copyToClipboard(formatParamsText(collectParams()));
+      flashCopied(e.currentTarget);
+    });
+    document.getElementById('btn-copy-json').addEventListener('click', (e) => {
+      copyToClipboard(JSON.stringify(collectParams(), null, 2));
+      flashCopied(e.currentTarget);
     });
 
     const updateLoop = () => {
@@ -845,6 +1102,7 @@
       sRadius.update();
       sEfW.update();
       sEbW.update();
+      maybeSaveParams();
       requestAnimationFrame(updateLoop);
     };
     requestAnimationFrame(updateLoop);

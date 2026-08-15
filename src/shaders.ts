@@ -15,7 +15,8 @@ varying vec2 vUv;
 uniform vec2 u_resolution;
 uniform vec3 u_box_size;    // sizeX, sizeY, sizeZ
 uniform float u_radius;     // bevel radius (0.001 ~ 0.25)
-uniform vec3 u_rot;         // rotX, rotY, rotZ in radians
+uniform mat3 u_mat;         // box orientation matrix (local -> cam)
+uniform mat3 u_mat_inv;     // inverse (cam -> local), = transpose for rotation matrices
 uniform float u_zoom;
 uniform int u_mode;         // 0: RGB, 1: HSB, 2: OKLCH
 uniform bool u_invert;
@@ -30,68 +31,14 @@ uniform bool u_back_dashed;
 uniform vec4 u_front_color;
 uniform vec4 u_back_color;
 
-// Matrix rotation matching camera-math.ts:
-// 1. X-axis (Pitch) -> 2. Y-axis (Roll) -> 3. Z-axis (Yaw)
-vec3 rotateToCam(vec3 p, vec3 r) {
-  // 1. X-axis (Pitch)
-  float cx = cos(r.x), sx = sin(r.x);
-  float x1 = p.x;
-  float y1 = p.y * cx - p.z * sx;
-  float z1 = p.y * sx + p.z * cx;
-
-  // 2. Y-axis (Roll: Z -> X, standard right-handed)
-  float cy = cos(r.y), sy = sin(r.y);
-  float x2 = x1 * cy - z1 * sy;
-  float y2 = y1;
-  float z2 = x1 * sy + z1 * cy;
-
-  // 3. Z-axis (Yaw)
-  float cz = cos(r.z), sz = sin(r.z);
-  float camX = x2 * cz - y2 * sz;
-  float camY = x2 * sz + y2 * cz;
-  float camZ = z2;
-
-  return vec3(camX, camY, camZ);
+// Box orientation matrix (matches camera-math.ts).
+// Forward: local -> cam, inverse: cam -> local (rotation matrix, so inverse = transpose).
+vec3 rotateToCam(vec3 p) {
+  return u_mat * p;
 }
 
-// Inverse rotation from Cam space back to Local box space
-// Mathematically exact inverse of transform3D:
-// p_cam = Rz * [ Ry * (Rx * p_local) ]
-// 1. Inv Z-axis:
-//   camX = x2 * cz - y2 * sz
-//   camY = x2 * sz + y2 * cz
-//   => x2 =  camX * cz + camY * sz
-//   => y2 = -camX * sz + camY * cz
-//   z2 = camZ
-// 2. Inv Y-axis:
-//   x2 = x1 * cy - z1 * sy
-//   z2 = x1 * sy + z1 * cy
-//   => x1 = x2 * cy + z2 * sy
-//   => z1 = -x2 * sy + z2 * cy
-//   y1 = y2
-// 3. Inv X-axis:
-//   x = x1
-//   y1 = y * cx - z * sx
-//   z1 = y * sx + z * cx
-//   => y = y1 * cx + z1 * sx
-//   => z = -y1 * sx + z1 * cx
-vec3 rotateToLocal(vec3 p, vec3 r) {
-  float cz = cos(r.z), sz = sin(r.z);
-  float x2 =  p.x * cz + p.y * sz;
-  float y2 = -p.x * sz + p.y * cz;
-  float z2 =  p.z;
-
-  float cy = cos(r.y), sy = sin(r.y);
-  float x1 = x2 * cy + z2 * sy;
-  float y1 = y2;
-  float z1 = -x2 * sy + z2 * cy;
-
-  float cx = cos(r.x), sx = sin(r.x);
-  float x = x1;
-  float y =  y1 * cx + z1 * sx;
-  float z = -y1 * sx + z1 * cx;
-
-  return vec3(x, y, z);
+vec3 rotateToLocal(vec3 p) {
+  return u_mat_inv * p;
 }
 
 // Inigo Quilez exact Signed Distance Function for 3D Rounded Box
@@ -130,7 +77,7 @@ void main() {
   // Exact scale factor matching project3D in camera-math.ts:
   // screen.x = center.x + camX * scale * 1.6 * zoom
   // screen.y = center.y - camY * scale * 1.6 * zoom
-  float scaleFactor = u_resolution.x * 0.26 * 1.6 * u_zoom;
+  float scaleFactor = u_resolution.x * 0.36 * 1.6 * u_zoom;
   
   // Note: WebGL gl_FragCoord.y is 0 at bottom, while 2D canvas is 0 at top.
   // In project3D, 2D canvas y = center.y - camY * scaleFactor.
@@ -153,7 +100,7 @@ void main() {
 
   for (int i = 0; i < 128; i++) {
     vec3 pCam = rayOrigin + rayDir * t;
-    pLocal = rotateToLocal(pCam, u_rot);
+    pLocal = rotateToLocal(pCam);
     float d = sdRoundBox(pLocal, halfSize, rad);
     if (d < 0.0005) {
       hit = t;
@@ -168,7 +115,7 @@ void main() {
     vec3 col = sampleBoxColor(pLocal, halfSize);
 
     // Subtle edge specular rim to enhance rounded edges curvature in 3D
-    vec3 nCam = rotateToCam(nLocal, u_rot);
+    vec3 nCam = rotateToCam(nLocal);
     float rim = pow(1.0 - max(dot(nCam, vec3(0.0, 0.0, -1.0)), 0.0), 3.0) * 0.08;
     vec3 finalCol = col + vec3(rim);
 
