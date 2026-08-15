@@ -39,23 +39,23 @@ export function transform3D(p: Vec3, cam: CameraConfig, box: BoxConfig): Vec3 {
   const y = (p.y - 0.5) * box.sizeY;
   const z = (p.z - 0.5) * box.sizeZ;
 
-  // 1. Z-axis Rotation (Yaw)
-  const cz = Math.cos(cam.rotZRad), sz = Math.sin(cam.rotZRad);
-  const x1 = x * cz - y * sz;
-  const y1 = x * sz + y * cz;
-  const z1 = z;
+  // 1. X-axis Rotation (围绕自身 X 轴旋转 Pitch / 仰俯)
+  const cx = Math.cos(cam.rotXRad), sx = Math.sin(cam.rotXRad);
+  const x1 = x;
+  const y1 = y * cx - z * sx;
+  const z1 = y * sx + z * cx;
 
-  // 2. Y-axis Rotation (Roll)
+  // 2. Y-axis Rotation (围绕自身 Y 轴旋转 Roll / 翻滚)
   const cy = Math.cos(cam.rotYRad), sy = Math.sin(cam.rotYRad);
   const x2 = x1 * cy + z1 * sy;
   const y2 = y1;
   const z2 = -x1 * sy + z1 * cy;
 
-  // 3. X-axis Rotation (Pitch)
-  const cx = Math.cos(cam.rotXRad), sx = Math.sin(cam.rotXRad);
-  const camX = x2;
-  const camY = z2 * cx - y2 * sx;
-  const camZ = z2 * sx + y2 * cx;
+  // 3. Z-axis Rotation (围绕自身 Z 轴旋转 Yaw / 偏航)
+  const cz = Math.cos(cam.rotZRad), sz = Math.sin(cam.rotZRad);
+  const camX = x2 * cz - y2 * sz;
+  const camY = x2 * sz + y2 * cz;
+  const camZ = z2;
 
   return { x: camX, y: camY, z: camZ };
 }

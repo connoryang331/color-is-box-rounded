@@ -31,13 +31,13 @@ uniform vec4 u_front_color;
 uniform vec4 u_back_color;
 
 // Matrix rotation matching camera-math.ts:
-// 1. Z-axis (Yaw) -> 2. Y-axis (Roll) -> 3. X-axis (Pitch)
+// 1. X-axis (Pitch) -> 2. Y-axis (Roll) -> 3. Z-axis (Yaw)
 vec3 rotateToCam(vec3 p, vec3 r) {
-  // 1. Z-axis (Yaw)
-  float cz = cos(r.z), sz = sin(r.z);
-  float x1 = p.x * cz - p.y * sz;
-  float y1 = p.x * sz + p.y * cz;
-  float z1 = p.z;
+  // 1. X-axis (Pitch)
+  float cx = cos(r.x), sx = sin(r.x);
+  float x1 = p.x;
+  float y1 = p.y * cx - p.z * sx;
+  float z1 = p.y * sx + p.z * cx;
 
   // 2. Y-axis (Roll)
   float cy = cos(r.y), sy = sin(r.y);
@@ -45,51 +45,51 @@ vec3 rotateToCam(vec3 p, vec3 r) {
   float y2 = y1;
   float z2 = -x1 * sy + z1 * cy;
 
-  // 3. X-axis (Pitch)
-  float cx = cos(r.x), sx = sin(r.x);
-  float camX = x2;
-  float camY = z2 * cx - y2 * sx;
-  float camZ = z2 * sx + y2 * cx;
+  // 3. Z-axis (Yaw)
+  float cz = cos(r.z), sz = sin(r.z);
+  float camX = x2 * cz - y2 * sz;
+  float camY = x2 * sz + y2 * cz;
+  float camZ = z2;
 
   return vec3(camX, camY, camZ);
 }
 
 // Inverse rotation from Cam space back to Local box space
 // Mathematically exact inverse of transform3D:
-// p_cam = Rx * [ Ry * (Rz * p_local) ]
-// 1. Inv X-axis:
-//   camY = z2 * cx - y2 * sx
-//   camZ = z2 * sx + y2 * cx
-//   => y2 = -camY * sx + camZ * cx
-//   => z2 =  camY * cx + camZ * sx
-//   x2 = camX
+// p_cam = Rz * [ Ry * (Rx * p_local) ]
+// 1. Inv Z-axis:
+//   camX = x2 * cz - y2 * sz
+//   camY = x2 * sz + y2 * cz
+//   => x2 =  camX * cz + camY * sz
+//   => y2 = -camX * sz + camY * cz
+//   z2 = camZ
 // 2. Inv Y-axis:
 //   x2 = x1 * cy + z1 * sy
 //   z2 = -x1 * sy + z1 * cy
 //   => x1 = x2 * cy - z2 * sy
 //   => z1 = x2 * sy + z2 * cy
 //   y1 = y2
-// 3. Inv Z-axis:
-//   x1 = x * cz - y * sz
-//   y1 = x * sz + y * cz
-//   => x = x1 * cz + y1 * sz
-//   => y = -x1 * sz + y1 * cz
-//   z = z1
+// 3. Inv X-axis:
+//   x = x1
+//   y1 = y * cx - z * sx
+//   z1 = y * sx + z * cx
+//   => y = y1 * cx + z1 * sx
+//   => z = -y1 * sx + z1 * cx
 vec3 rotateToLocal(vec3 p, vec3 r) {
-  float cx = cos(r.x), sx = sin(r.x);
-  float x2 = p.x;
-  float y2 = -p.y * sx + p.z * cx;
-  float z2 =  p.y * cx + p.z * sx;
+  float cz = cos(r.z), sz = sin(r.z);
+  float x2 =  p.x * cz + p.y * sz;
+  float y2 = -p.x * sz + p.y * cz;
+  float z2 =  p.z;
 
   float cy = cos(r.y), sy = sin(r.y);
   float x1 = x2 * cy - z2 * sy;
   float y1 = y2;
   float z1 = x2 * sy + z2 * cy;
 
-  float cz = cos(r.z), sz = sin(r.z);
-  float x =  x1 * cz + y1 * sz;
-  float y = -x1 * sz + y1 * cz;
-  float z = z1;
+  float cx = cos(r.x), sx = sin(r.x);
+  float x = x1;
+  float y =  y1 * cx + z1 * sx;
+  float z = -y1 * sx + z1 * cx;
 
   return vec3(x, y, z);
 }

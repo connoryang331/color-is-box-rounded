@@ -91,17 +91,17 @@ export function createRoundedBoxPicker(
     const cz = Math.cos(cam.rotZRad), sz = Math.sin(cam.rotZRad);
 
     const rotToLocal = (p: Vec3): Vec3 => {
-      const x2 = p.x;
-      const y2 = -p.y * sx + p.z * cx;
-      const z2 =  p.y * cx + p.z * sx;
+      const x2 =  p.x * cz + p.y * sz;
+      const y2 = -p.x * sz + p.y * cz;
+      const z2 =  p.z;
 
       const x1 = x2 * cy - z2 * sy;
       const y1 = y2;
       const z1 = x2 * sy + z2 * cy;
 
-      const x =  x1 * cz + y1 * sz;
-      const y = -x1 * sz + y1 * cz;
-      const z = z1;
+      const x = x1;
+      const y =  y1 * cx + z1 * sx;
+      const z = -y1 * sx + z1 * cx;
       return { x, y, z };
     };
 
