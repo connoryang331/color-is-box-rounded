@@ -255,6 +255,7 @@ export function renderRoundedBox(
   svAnchor: Vec3 | null,
   svMix: { a: number; b: number; g: number } | null,
   svShow: boolean,
+  svReveal: number,
 ): void {
   const { gl, overlayCtx, width, height, program, uniforms } = rc;
   const dpr = window.devicePixelRatio || 1;
@@ -306,7 +307,9 @@ export function renderRoundedBox(
   const center: Vec2 = { x: width * 0.5, y: height * 0.5 };
   let svTri: SaturationTriangle | null = null;
   let svAxis: SaturationTriangle | null = null; // degenerate (gray/white/black): just the W–K gray axis
-  if (guides.svTriangle && svShow) {
+  // Compute while shown (Ctrl held) or while the fold animation is still playing back.
+  const svVisible = svShow || svReveal > 0.001;
+  if (guides.svTriangle && svVisible) {
     const tri = projectSaturationTriangle(svAnchor || dotValues, mode, scale, center, cam, box);
     // Degenerate triangles (gray / white / black current color → C lies on the W–K edge) collapse
     // to the W–K gray axis, which we still draw so the axis stays discoverable.
@@ -314,6 +317,10 @@ export function renderRoundedBox(
     if (area > 4) svTri = tri;
     else svAxis = tri;
   }
+  // Reveal animation: unfold the triangle from its C vertex (the current color point) on show,
+  // fold back on hide. Opaque scaling (no blending), so it stays crisp over the box.
+  const svScale = svReveal < 0.5 ? 2 * svReveal * svReveal : 1 - Math.pow(-2 * svReveal + 2, 2) / 2; // easeInOutQuad
+  if (svTri && svScale < 0.01) svTri = null; // fully collapsed: skip the GL fill
 
   // 1.5 Saturation Triangle Gradient Fill (exact Gouraud shading on the GPU):
   // vertex colors C / white / black, so each pixel shows the true mix a·C + b·white + g·black —
@@ -323,15 +330,21 @@ export function renderRoundedBox(
       (p.x / width) * 2 - 1,
       1 - (p.y / height) * 2,
     ];
-    const c = toClip(svTri.c);
-    const w = toClip(svTri.w);
-    const k = toClip(svTri.k);
+    // Scale W / K toward the fixed C vertex by the reveal progress (C stays at the current color)
+    const tri = svTri;
+    const lerpTo = (p: Vec2): Vec2 => ({
+      x: tri.c.x + (p.x - tri.c.x) * svScale,
+      y: tri.c.y + (p.y - tri.c.y) * svScale,
+    });
+    const c = toClip(tri.c);
+    const w = toClip(lerpTo(tri.w));
+    const k = toClip(lerpTo(tri.k));
     gl.useProgram(rc.triProgram);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.bindBuffer(gl.ARRAY_BUFFER, rc.triBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      c[0], c[1], svTri.cRGB.x, svTri.cRGB.y, svTri.cRGB.z,
+      c[0], c[1], tri.cRGB.x, tri.cRGB.y, tri.cRGB.z,
       w[0], w[1], 1, 1, 1,
       k[0], k[1], 0, 0, 0,
     ]), gl.STATIC_DRAW);
@@ -368,6 +381,7 @@ export function renderRoundedBox(
   if (svAxis) {
     const tri = svAxis;
     overlayCtx.save();
+    overlayCtx.globalAlpha = svReveal;
     overlayCtx.beginPath();
     overlayCtx.moveTo(tri.k.x, tri.k.y);
     overlayCtx.lineTo(tri.w.x, tri.w.y);
@@ -379,16 +393,24 @@ export function renderRoundedBox(
     overlayCtx.restore();
   }
   if (svTri) {
+    // Same unfold scaling as the GL fill, so edges / dots / marker stay glued to the gradient
     const tri = svTri;
+    const lerpTo = (p: Vec2): Vec2 => ({
+      x: tri.c.x + (p.x - tri.c.x) * svScale,
+      y: tri.c.y + (p.y - tri.c.y) * svScale,
+    });
+    const w = lerpTo(tri.w);
+    const k = lerpTo(tri.k);
     const cr = Math.round(tri.cRGB.x * 255);
     const cg = Math.round(tri.cRGB.y * 255);
     const cb = Math.round(tri.cRGB.z * 255);
 
     overlayCtx.save();
+    overlayCtx.globalAlpha = svReveal;
     overlayCtx.beginPath();
     overlayCtx.moveTo(tri.c.x, tri.c.y);
-    overlayCtx.lineTo(tri.w.x, tri.w.y);
-    overlayCtx.lineTo(tri.k.x, tri.k.y);
+    overlayCtx.lineTo(w.x, w.y);
+    overlayCtx.lineTo(k.x, k.y);
     overlayCtx.closePath();
     overlayCtx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, 0.7)`;
     overlayCtx.lineWidth = 1.2;
@@ -397,7 +419,7 @@ export function renderRoundedBox(
 
       // Vertex markers: white corner (white fill + dark ring), black corner (dark fill + light ring)
       overlayCtx.beginPath();
-      overlayCtx.arc(tri.w.x, tri.w.y, 3.5, 0, Math.PI * 2);
+      overlayCtx.arc(w.x, w.y, 3.5, 0, Math.PI * 2);
       overlayCtx.fillStyle = '#ffffff';
       overlayCtx.fill();
       overlayCtx.strokeStyle = 'rgba(17, 24, 39, 0.6)';
@@ -405,7 +427,7 @@ export function renderRoundedBox(
       overlayCtx.stroke();
 
       overlayCtx.beginPath();
-      overlayCtx.arc(tri.k.x, tri.k.y, 3.5, 0, Math.PI * 2);
+      overlayCtx.arc(k.x, k.y, 3.5, 0, Math.PI * 2);
       overlayCtx.fillStyle = '#111827';
       overlayCtx.fill();
       overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
@@ -415,8 +437,8 @@ export function renderRoundedBox(
       // Position marker: the current color's mix (a·C + b·W + g·K) inside the anchored triangle.
       // It follows the pointer while dragging and rests at the final position after release.
       if (svMix) {
-        const mx = svMix.a * tri.c.x + svMix.b * tri.w.x + svMix.g * tri.k.x;
-        const my = svMix.a * tri.c.y + svMix.b * tri.w.y + svMix.g * tri.k.y;
+        const mx = svMix.a * tri.c.x + svMix.b * w.x + svMix.g * k.x;
+        const my = svMix.a * tri.c.y + svMix.b * w.y + svMix.g * k.y;
         overlayCtx.beginPath();
         overlayCtx.arc(mx, my, 4, 0, Math.PI * 2);
         overlayCtx.fillStyle = '#ffffff';

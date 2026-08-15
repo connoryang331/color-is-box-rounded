@@ -115,7 +115,8 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | `R` | reset view |
 | `F` / `B` / `T` | front / back / top view (camera only — object values unchanged) |
 | `←` `→` / `↑` `↓` | nudge ROT Y / ROT X by 5° |
-| Hold `Ctrl` / `⌘` | reveal the saturation triangle (hidden by default) |
+| Hold `Ctrl` / `⌘` | reveal the saturation triangle (hidden by default) — it unfolds from the current color point |
+| Release `Ctrl` / `⌘` | the triangle folds back into the current color point |
 | `Ctrl` / `⌘` + drag inside triangle | adjust saturation & brightness (hue preserved); marker dot shows the current position; release `Ctrl` to hide |
 | `Ctrl` / `⌘` with a gray / white / black color | triangle degenerates — the W–K gray axis is drawn instead |
 

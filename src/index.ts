@@ -71,6 +71,31 @@ export function createRoundedBoxPicker(
   // The saturation triangle is revealed on demand: hold Ctrl / Cmd to show and use it.
   // Without the modifier, left-click always picks from the cube surface (no accidental tuning).
   let isCtrlHeld = false;
+  // Reveal animation: svReveal goes 0 -> 1 while Ctrl is held (triangle unfolds from the current
+  // color point) and 1 -> 0 on release (folds back). Driven by a self-scheduling rAF loop.
+  let svReveal = 0;
+  let svRevealTarget = 0;
+  let svAnimFrame: number | null = null;
+  const animateReveal = (target: number) => {
+    svRevealTarget = target;
+    if (svAnimFrame !== null) return; // already animating toward the latest target
+    let last = performance.now();
+    const speed = 6.0; // full transition in ~165 ms
+    const step = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (svRevealTarget > svReveal) svReveal = Math.min(svRevealTarget, svReveal + dt * speed);
+      else svReveal = Math.max(svRevealTarget, svReveal - dt * speed);
+      scheduleRender();
+      if (Math.abs(svReveal - svRevealTarget) < 0.001) {
+        svReveal = svRevealTarget;
+        svAnimFrame = null;
+      } else {
+        svAnimFrame = requestAnimationFrame(step);
+      }
+    };
+    svAnimFrame = requestAnimationFrame(step);
+  };
 
   const listeners = new Set<ColorChangeCallback>();
   const rc = initWebGL(container, size);
@@ -79,7 +104,7 @@ export function createRoundedBoxPicker(
   const scheduleRender = () => {
     if (animId !== null) return;      animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isCtrlHeld);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isCtrlHeld, svReveal);
     });
   };
 
@@ -367,7 +392,7 @@ export function createRoundedBoxPicker(
         isCtrlHeld = true;
         svAnchor = null;
         svMix = null;
-        scheduleRender();
+        animateReveal(1);
       }
       return;
     }
@@ -413,9 +438,9 @@ export function createRoundedBoxPicker(
   const onKeyUp = (e: KeyboardEvent) => {
     if ((e.key === 'Control' || e.key === 'Meta') && isCtrlHeld) {
       isCtrlHeld = false;
-      svAnchor = null;
-      svMix = null;
-      scheduleRender();
+      // Keep svAnchor/svMix: the triangle folds back together with its marker (renderer keeps
+      // drawing while svReveal > 0). The next reveal resets the anchor to the current color.
+      animateReveal(0);
     }
   };
   window.addEventListener('keyup', onKeyUp);
@@ -423,9 +448,7 @@ export function createRoundedBoxPicker(
   const onWindowBlur = () => {
     if (isCtrlHeld) {
       isCtrlHeld = false;
-      svAnchor = null;
-      svMix = null;
-      scheduleRender();
+      animateReveal(0);
     }
   };
   window.addEventListener('blur', onWindowBlur);
@@ -543,6 +566,7 @@ export function createRoundedBoxPicker(
     },
     destroy: () => {
       if (animId !== null) cancelAnimationFrame(animId);
+      if (svAnimFrame !== null) cancelAnimationFrame(svAnimFrame);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onWindowBlur);
