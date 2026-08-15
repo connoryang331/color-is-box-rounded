@@ -115,6 +115,9 @@ const picker = createRoundedBoxPicker(holderEl, { size: 460 });
 | `R` | reset view |
 | `F` / `B` / `T` | front / back / top view (camera only — object values unchanged) |
 | `←` `→` / `↑` `↓` | nudge ROT Y / ROT X by 5° |
+| Hold `Ctrl` / `⌘` | reveal the saturation triangle (hidden by default) |
+| `Ctrl` / `⌘` + drag inside triangle | adjust saturation & brightness (hue preserved); marker dot shows the current position; release `Ctrl` to hide |
+| `Ctrl` / `⌘` with a gray / white / black color | triangle degenerates — the W–K gray axis is drawn instead |
 
 Rotation model: all rotations pivot around the box's own local axes. `objMat` holds the object
 orientation (driven by sliders / presets) and `viewMat` holds the camera orientation (driven by
