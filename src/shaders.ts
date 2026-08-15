@@ -20,27 +20,31 @@ uniform float u_zoom;
 uniform int u_mode;         // 0: RGB, 1: HSB, 2: OKLCH
 uniform bool u_invert;
 
-// Matrix rotation
+// Matrix rotation matching camera-math.ts:
+// 1. Z-axis (Yaw) -> 2. Y-axis (Roll) -> 3. X-axis (Pitch)
 mat3 getRotMatrix(vec3 r) {
-  float cx = cos(r.x), sx = sin(r.x);
-  float cy = cos(r.y), sy = sin(r.y);
   float cz = cos(r.z), sz = sin(r.z);
-
   mat3 rz = mat3(
-    cz, -sz, 0.0,
-    sz,  cz, 0.0,
+     cz, -sz, 0.0,
+     sz,  cz, 0.0,
     0.0, 0.0, 1.0
   );
+
+  float cy = cos(r.y), sy = sin(r.y);
   mat3 ry = mat3(
-    cy, 0.0, sy,
+     cy, 0.0,  sy,
     0.0, 1.0, 0.0,
-   -sy, 0.0, cy
+    -sy, 0.0,  cy
   );
+
+  float cx = cos(r.x), sx = sin(r.x);
   mat3 rx = mat3(
     1.0, 0.0, 0.0,
-    0.0, cx, -sx,
-    0.0, sx,  cx
+    0.0,  cx, -sx,
+    0.0,  sx,  cx
   );
+
+  // transform3D: p_cam = rx * ry * rz * p_local
   return rx * ry * rz;
 }
 
@@ -63,8 +67,8 @@ vec3 calcNormal(vec3 p, vec3 b, float r) {
 }
 
 // Convert 3D local position to RGB Color
-vec3 sampleBoxColor(vec3 localPos, vec3 b, float r) {
-  // Map [-b, +b] back to [0.0, 1.0] normalized RGB space
+vec3 sampleBoxColor(vec3 localPos, vec3 b) {
+  // Map [-b, +b] back to [0.0, 1.0] normalized space
   vec3 norm = (localPos / (b * 2.0)) + 0.5;
   norm = clamp(norm, 0.0, 1.0);
   if (u_invert) {
@@ -74,22 +78,30 @@ vec3 sampleBoxColor(vec3 localPos, vec3 b, float r) {
 }
 
 void main() {
-  vec2 st = (gl_FragCoord.xy - u_resolution * 0.5) / min(u_resolution.x, u_resolution.y);
-  st.y = -st.y; // Match screen space Y
+  // Normalized device coordinates centered at (0, 0)
+  vec2 screenPos = gl_FragCoord.xy - u_resolution * 0.5;
+  
+  // Exact scale factor matching project3D:
+  // 2D_offset = local_cam_offset * (width * 0.26 * 1.6 * zoom)
+  float scaleFactor = u_resolution.x * 0.26 * 1.6 * u_zoom;
+  
+  // Invert screen Y so Y+ is Up (matching 2D canvas Y-down inversion in project3D)
+  vec2 camXY = vec2(screenPos.x, screenPos.y) / scaleFactor;
 
   vec3 halfSize = u_box_size * 0.5;
-  float rad = clamp(u_radius, 0.001, min(min(halfSize.x, halfSize.y), halfSize.z) * 0.95);
+  float maxR = min(min(halfSize.x, halfSize.y), halfSize.z) * 0.45;
+  float rad = clamp(u_radius, 0.001, maxR);
 
   mat3 rot = getRotMatrix(u_rot);
+  // invRot = transpose of rot
   mat3 invRot = mat3(
     rot[0][0], rot[1][0], rot[2][0],
     rot[0][1], rot[1][1], rot[2][1],
     rot[0][2], rot[1][2], rot[2][2]
   );
 
-  // Orthographic ray
-  float viewScale = 0.28 * u_zoom;
-  vec3 rayOrigin = vec3(st / viewScale, -4.0);
+  // Orthographic ray from near plane to far plane in camera space
+  vec3 rayOrigin = vec3(camXY, -5.0);
   vec3 rayDir = vec3(0.0, 0.0, 1.0);
 
   // Raymarching
@@ -97,29 +109,27 @@ void main() {
   float hit = -1.0;
   vec3 pLocal = vec3(0.0);
 
-  for (int i = 0; i < 96; i++) {
+  for (int i = 0; i < 128; i++) {
     vec3 pCam = rayOrigin + rayDir * t;
     pLocal = invRot * pCam;
     float d = sdRoundBox(pLocal, halfSize, rad);
-    if (d < 0.001) {
+    if (d < 0.0005) {
       hit = t;
       break;
     }
     t += d;
-    if (t > 8.0) break;
+    if (t > 10.0) break;
   }
 
   if (hit > 0.0) {
     vec3 nLocal = calcNormal(pLocal, halfSize, rad);
-    vec3 col = sampleBoxColor(pLocal, halfSize, rad);
+    vec3 col = sampleBoxColor(pLocal, halfSize);
 
-    // Subtle ambient lighting & curvature shading for hyper-realistic 3D look
+    // Subtle edge specular rim to enhance rounded edges curvature
     vec3 nCam = rot * nLocal;
-    vec3 lightDir = normalize(vec3(0.3, 0.6, -1.0));
-    float diff = max(dot(nCam, -lightDir), 0.0) * 0.12;
-    float rim = pow(1.0 - max(dot(nCam, vec3(0.0, 0.0, -1.0)), 0.0), 2.5) * 0.15;
+    float rim = pow(1.0 - max(dot(nCam, vec3(0.0, 0.0, -1.0)), 0.0), 3.0) * 0.08;
 
-    vec3 finalCol = col * (0.92 + diff) + vec3(rim);
+    vec3 finalCol = col + vec3(rim);
     gl_FragColor = vec4(clamp(finalCol, 0.0, 1.0), 1.0);
   } else {
     discard; // Transparent background
