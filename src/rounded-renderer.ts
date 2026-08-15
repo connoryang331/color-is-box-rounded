@@ -5,10 +5,14 @@ import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
 import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb } from './color-math';
 
-/** Radius of the inner (alpha) ring around the pick dot, in canvas px. */
-export const RING_INNER_R = 26;
-/** Radius of the outer (saturation) ring around the pick dot, in canvas px. */
-export const RING_OUTER_R = 44;
+/** Radius (band center) of the inner (alpha) ring around the pick dot, in canvas px. */
+export const RING_INNER_R = 30;
+/** Band width of the inner (alpha) ring, in canvas px. */
+export const RING_INNER_W = 12;
+/** Radius (band center) of the outer (saturation) ring around the pick dot, in canvas px. */
+export const RING_OUTER_R = 56;
+/** Band width of the outer (saturation) ring, in canvas px. */
+export const RING_OUTER_W = 16;
 
 export interface WebGLRenderContext {
   gl: WebGLRenderingContext;
@@ -503,6 +507,8 @@ export function renderRoundedBox(
     const ease = ringReveal < 0.5 ? 2 * ringReveal * ringReveal : 1 - Math.pow(-2 * ringReveal + 2, 2) / 2;
     const rIn = RING_INNER_R * ease;
     const rOut = RING_OUTER_R * ease;
+    const wIn = RING_INNER_W * ease;
+    const wOut = RING_OUTER_W * ease;
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
     const hsb = rgbToHsb(finalRgb);
@@ -511,41 +517,83 @@ export function renderRoundedBox(
     overlayCtx.save();
     overlayCtx.globalAlpha = Math.min(1, ease + 0.15);
 
-    const drawRing = (r: number, value: number, label: string, active: boolean, isAlpha: boolean) => {
-      // track
-      overlayCtx.lineWidth = active ? 5 : 3.5;
+    // Checkerboard filled across an annulus band — the classic "transparent" indicator.
+    const checkerBand = (r: number, w: number) => {
+      overlayCtx.save();
       overlayCtx.beginPath();
-      overlayCtx.arc(ringAnchor.x, ringAnchor.y, r, 0, Math.PI * 2);
-      overlayCtx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
-      overlayCtx.stroke();
-      // value arc (0 at 12 o'clock, clockwise)
-      const end = start + value * Math.PI * 2;
-      if (value > 0.001) {
-        overlayCtx.beginPath();
-        overlayCtx.arc(ringAnchor.x, ringAnchor.y, r, start, end);
-        if (isAlpha) {
-          // translucent color over a light underlay so the alpha reads against any box color
-          overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-          overlayCtx.stroke();
-          overlayCtx.beginPath();
-          overlayCtx.arc(ringAnchor.x, ringAnchor.y, r, start, end);
-          overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`;
-          overlayCtx.stroke();
-        } else {
-          overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-          overlayCtx.stroke();
+      overlayCtx.arc(ringAnchor.x, ringAnchor.y, r + w / 2, 0, Math.PI * 2);
+      overlayCtx.arc(ringAnchor.x, ringAnchor.y, Math.max(0.5, r - w / 2), 0, Math.PI * 2, true);
+      overlayCtx.closePath();
+      overlayCtx.clip();
+      const cs = 6;
+      const rr = r + w / 2;
+      for (let gy = -rr; gy < rr; gy += cs) {
+        for (let gx = -rr; gx < rr; gx += cs) {
+          overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
+          overlayCtx.fillRect(ringAnchor.x + gx, ringAnchor.y + gy, cs, cs);
         }
       }
-      // label
-      overlayCtx.fillStyle = active ? '#f8fafc' : 'rgba(203, 213, 225, 0.85)';
-      overlayCtx.font = '9px ui-monospace, SF Mono, monospace';
-      overlayCtx.textAlign = 'center';
-      overlayCtx.textBaseline = 'alphabetic';
-      overlayCtx.fillText(label, ringAnchor.x, ringAnchor.y - r + 1);
+      overlayCtx.restore();
     };
 
-    drawRing(rOut, hsb.s / 100, 'SAT', ringBand === 'sat', false);
-    drawRing(rIn, alpha, 'A', ringBand === 'alpha', true);
+    // Band edges (inner + outer circle outlines) — the active ring gets a bright outline
+    const bandEdges = (r: number, w: number, active: boolean) => {
+      overlayCtx.lineWidth = active ? 1.8 : 1;
+      overlayCtx.strokeStyle = active ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.4)';
+      for (const rr of [r - w / 2, r + w / 2]) {
+        if (rr <= 0) continue;
+        overlayCtx.beginPath();
+        overlayCtx.arc(ringAnchor.x, ringAnchor.y, rr, 0, Math.PI * 2);
+        overlayCtx.stroke();
+      }
+    };
+
+    // Ring label above 12 o'clock, bold with a dark outline so it reads over any face color
+    const ringLabel = (text: string, r: number, w: number, active: boolean) => {
+      const x = ringAnchor.x;
+      const y = ringAnchor.y - (r + w / 2) - 2;
+      overlayCtx.font = '700 12px ui-monospace, SF Mono, monospace';
+      overlayCtx.textAlign = 'center';
+      overlayCtx.textBaseline = 'alphabetic';
+      overlayCtx.lineWidth = 3;
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
+      overlayCtx.strokeText(text, x, y);
+      overlayCtx.fillStyle = active ? '#ffffff' : 'rgba(248, 250, 252, 0.95)';
+      overlayCtx.fillText(text, x, y);
+    };
+
+    // Outer ring — SATURATION: neutral track, solid-color value arc (0 at 12 o'clock, clockwise)
+    const sat = hsb.s / 100;
+    overlayCtx.beginPath();
+    overlayCtx.arc(ringAnchor.x, ringAnchor.y, rOut, 0, Math.PI * 2);
+    overlayCtx.lineWidth = wOut;
+    overlayCtx.strokeStyle = 'rgba(100, 116, 139, 0.5)';
+    overlayCtx.stroke();
+    const satEnd = start + sat * Math.PI * 2;
+    if (sat > 0.001) {
+      overlayCtx.beginPath();
+      overlayCtx.arc(ringAnchor.x, ringAnchor.y, rOut, start, satEnd);
+      overlayCtx.lineWidth = wOut;
+      overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+      overlayCtx.stroke();
+    }
+    bandEdges(rOut, wOut, ringBand === 'sat');
+    ringLabel('SAT', rOut, wOut, ringBand === 'sat');
+
+    // Inner ring — ALPHA: checkerboard track (standard transparency-bar look in ring form);
+    // the value arc is the color at its alpha over the checkerboard, so the arc itself shows
+    // the exact result and the empty arc reads as fully transparent.
+    checkerBand(rIn, wIn);
+    const alphaEnd = start + alpha * Math.PI * 2;
+    if (alpha > 0.001) {
+      overlayCtx.beginPath();
+      overlayCtx.arc(ringAnchor.x, ringAnchor.y, rIn, start, alphaEnd);
+      overlayCtx.lineWidth = wIn;
+      overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`;
+      overlayCtx.stroke();
+    }
+    bandEdges(rIn, wIn, ringBand === 'alpha');
+    ringLabel('A', rIn, wIn, ringBand === 'alpha');
 
     overlayCtx.restore();
   }

@@ -5,7 +5,7 @@ import type {
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle } from './camera-math';
 import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, hsbToRgb } from './color-math';
-import { initWebGL, renderRoundedBox, RING_INNER_R, RING_OUTER_R } from './rounded-renderer';
+import { initWebGL, renderRoundedBox, RING_INNER_R, RING_INNER_W, RING_OUTER_R, RING_OUTER_W } from './rounded-renderer';
 
 export interface RoundedBoxOptions {
   initialColor?: RGBColor;
@@ -436,8 +436,8 @@ export function createRoundedBoxPicker(
       const eReveal = easeInOutQuad(ringReveal);
       const rIn = RING_INNER_R * eReveal;
       const rOut = RING_OUTER_R * eReveal;
-      const outBand = Math.abs(dist - rOut) <= 7;
-      const inBand = Math.abs(dist - rIn) <= 7;
+      const outBand = Math.abs(dist - rOut) <= (RING_OUTER_W * eReveal) / 2 + 2;
+      const inBand = Math.abs(dist - rIn) <= (RING_INNER_W * eReveal) / 2 + 2;
       const band: 'alpha' | 'sat' | null = outBand ? 'sat' : inBand ? 'alpha' : null;
       ringBand = band;
       if (band) {
