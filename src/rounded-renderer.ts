@@ -96,6 +96,14 @@ export function initWebGL(container: HTMLElement, size: number): WebGLRenderCont
     u_zoom: gl.getUniformLocation(program, 'u_zoom')!,
     u_mode: gl.getUniformLocation(program, 'u_mode')!,
     u_invert: gl.getUniformLocation(program, 'u_invert')!,
+    u_show_front: gl.getUniformLocation(program, 'u_show_front')!,
+    u_show_back: gl.getUniformLocation(program, 'u_show_back')!,
+    u_front_width: gl.getUniformLocation(program, 'u_front_width')!,
+    u_back_width: gl.getUniformLocation(program, 'u_back_width')!,
+    u_front_dashed: gl.getUniformLocation(program, 'u_front_dashed')!,
+    u_back_dashed: gl.getUniformLocation(program, 'u_back_dashed')!,
+    u_front_color: gl.getUniformLocation(program, 'u_front_color')!,
+    u_back_color: gl.getUniformLocation(program, 'u_back_color')!,
   };
 
   return {
@@ -327,11 +335,21 @@ export function renderRoundedBox(
   gl.useProgram(program);
   gl.uniform2f(uniforms.u_resolution, width * dpr, height * dpr);
   gl.uniform3f(uniforms.u_box_size, box.sizeX, box.sizeY, box.sizeZ);
-  gl.uniform1f(uniforms.u_radius, box.radius || 0.001);
+  gl.uniform1f(uniforms.u_radius, box.radius !== undefined ? box.radius : 0.001);
   gl.uniform3f(uniforms.u_rot, cam.rotXRad, cam.rotYRad, cam.rotZRad);
   gl.uniform1f(uniforms.u_zoom, cam.zoom || 1.0);
   gl.uniform1i(uniforms.u_mode, mode === 'rgb' ? 0 : mode === 'hsb' ? 1 : 2);
   gl.uniform1i(uniforms.u_invert, invert ? 1 : 0);
+
+  // 12 Edges GPU parameters
+  gl.uniform1i(uniforms.u_show_front, edgeStyle.showFront ? 1 : 0);
+  gl.uniform1i(uniforms.u_show_back, edgeStyle.showBack ? 1 : 0);
+  gl.uniform1f(uniforms.u_front_width, edgeStyle.frontWidth || 1.5);
+  gl.uniform1f(uniforms.u_back_width, edgeStyle.backWidth || 1.0);
+  gl.uniform1i(uniforms.u_front_dashed, edgeStyle.frontDashed ? 1 : 0);
+  gl.uniform1i(uniforms.u_back_dashed, edgeStyle.backDashed ? 1 : 0);
+  gl.uniform4f(uniforms.u_front_color, 1.0, 1.0, 1.0, edgeStyle.frontOpacity || 0.65);
+  gl.uniform4f(uniforms.u_back_color, 1.0, 1.0, 1.0, edgeStyle.backOpacity || 0.25);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
