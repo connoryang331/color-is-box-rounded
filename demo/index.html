@@ -57,8 +57,18 @@
   .center-col { display: flex; flex-direction: column; align-items: center; gap: 0; }
   h1 { margin: 0 0 16px; font-size: 18px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-title); text-align: center; }
   .subtitle { margin: 14px 0 0; font-size: 12px; font-weight: 400; letter-spacing: .04em; color: var(--text-subtitle); text-align: center; }
-  .panel-holder { background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 14px; box-shadow: var(--shadow-panel); padding: 0; overflow: hidden; }
-  .panel-info { background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 14px; padding: 20px 24px; box-shadow: var(--shadow-panel); width: 320px; min-height: 252px; box-sizing: border-box; display: flex; flex-direction: column; }
+  .panel-holder {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+  }
+  .panel-info { background: var(--bg-panel); border: 1px solid var(--border-panel); border-radius: 14px; padding: 20px 24px; box-shadow: var(--shadow-panel); width: 320px; min-height: 252px; box-sizing: border-box; display: flex; flex-direction: column; transition: opacity 0.2s, transform 0.2s; }
+  .panel-info.hidden-panel {
+    display: none !important;
+  }
   #current-card { position: fixed; right: 24px; bottom: 24px; }
   #how-card { position: fixed; left: 24px; bottom: 24px; }
   h3 { margin: 0 0 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-h3); }
@@ -67,122 +77,42 @@
   .row .label { font-size: 12px; font-weight: 600; color: var(--text-label); letter-spacing: .01em; width: 62px; flex-shrink: 0; }
   .row .val { font: 12.5px/1.5 ui-monospace, "SF Mono", "Cascadia Code", monospace; color: var(--text-val); letter-spacing: .01em; text-align: left; margin-left: 0; flex: 1; }
 
-  /* Blender-style numeric slider */
-  .blender-slider {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 155px;
-    height: 26px;
-    background: var(--bg-slider);
-    border: 1px solid var(--border-slider);
-    border-radius: 5px;
-    overflow: hidden;
-    cursor: ew-resize;
-    user-select: none;
-    box-shadow: var(--shadow-slider);
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .blender-slider:hover {
-    border-color: var(--border-slider-hover);
-  }
-  .blender-slider .bar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 50%;
-    opacity: 0.18;
-    pointer-events: none;
-    transition: width 0.04s linear;
-  }
-  .blender-slider.rot-x .bar { background: #ef4444; opacity: 0.22; }
-  .blender-slider.rot-y .bar { background: #22c55e; opacity: 0.22; }
-  .blender-slider.rot-z .bar { background: #3b82f6; opacity: 0.22; }
-  .blender-slider input {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background: transparent;
-    border: none;
-    outline: none;
-    text-align: center;
-    font: 12px/26px ui-monospace, "SF Mono", monospace;
-    font-weight: 600;
-    color: var(--text-slider);
-    cursor: ew-resize;
-    padding: 0 4px;
-    box-sizing: border-box;
-    pointer-events: none;
-  }
-  .blender-slider.typing input,
-  .blender-slider input:focus {
-    background: var(--bg-slider);
-    color: var(--text-val);
-    cursor: text;
-    border: 1px solid #3b82f6;
-    pointer-events: auto;
-  }
-
-  .guides-panel {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--border-dashed);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .guide-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-  }
-  .guide-header span {
+  /* Preset Icon Buttons (Cube / Cuboid) */
+  .btn-preset {
+    height: 32px;
     font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--text-label);
-  }
-  .btn-all-group { display: flex; gap: 4px; }
-  .btn-mini {
-    background: var(--bg-btn);
-    border: 1px solid var(--border-btn);
-    border-radius: 4px;
-    font-size: 10px;
     font-weight: 600;
-    padding: 2px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--bg-btn);
+    color: var(--text-val);
+    border: 1px solid var(--border-btn);
+    border-radius: 6px;
+    box-shadow: var(--shadow-slider);
     cursor: pointer;
-    color: var(--text-btn);
     transition: all 0.15s;
   }
-  .btn-mini:hover { background: var(--bg-btn-hover); color: var(--text-val); }
-  .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .guide-toggle-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-body);
-    cursor: pointer;
-    user-select: none;
+  .btn-preset:hover {
+    background: var(--bg-btn-hover);
+    border-color: var(--border-slider-hover);
   }
-  .guide-toggle-item input[type="checkbox"] { accent-color: #007AFF; cursor: pointer; margin: 0; }
-  .guide-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-  .guide-dot.red { background: #ef4444; }
-  .guide-dot.green { background: #22c55e; }
-  .guide-dot.blue { background: #3b82f6; }
 
-  /* Theme Toggle Floating Button */
-  .theme-toggle-btn {
+  /* Theme Toggle & Panels Toggle Floating Buttons */
+  .top-action-bar {
     position: fixed;
     top: 24px;
     right: 24px;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 100;
+  }
+  .action-btn {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 18px;
     background: var(--bg-panel);
     border: 1px solid var(--border-panel);
     box-shadow: var(--shadow-panel);
@@ -190,33 +120,50 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text-title);
     transition: transform 0.15s, background 0.2s, border-color 0.2s;
-    z-index: 100;
   }
-  .theme-toggle-btn:hover {
-    transform: scale(1.06);
+  .action-btn.icon-only {
+    width: 36px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .action-btn:hover {
+    transform: scale(1.04);
   }
 </style>
 </head>
 <body>
-  <!-- Theme Toggle Floating Button -->
-  <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Dark / Light Theme">
-    <svg id="theme-icon-sun" style="display: none;" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="5"></circle>
-      <line x1="12" y1="1" x2="12" y2="3"></line>
-      <line x1="12" y1="21" x2="12" y2="23"></line>
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-      <line x1="1" y1="12" x2="3" y2="12"></line>
-      <line x1="21" y1="12" x2="23" y2="12"></line>
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-    </svg>
-    <svg id="theme-icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-    </svg>
-  </button>
+  <!-- Top Floating Actions: Panels Toggle & Dark/Light Theme -->
+  <div class="top-action-bar">
+    <button id="panels-toggle" class="action-btn" title="Toggle Side Panels (How to use & Transform Parameters)">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="9" y1="3" x2="9" y2="21"></line>
+        <line x1="15" y1="3" x2="15" y2="21"></line>
+      </svg>
+      <span id="panels-toggle-text">Hide Panels</span>
+    </button>
+    <button id="theme-toggle" class="action-btn icon-only" title="Toggle Dark / Light Theme">
+      <svg id="theme-icon-sun" style="display: none;" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </svg>
+      <svg id="theme-icon-moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+  </div>
 
   <div class="panel-info" id="current-card" style="width: 320px;">
     <h3>Transform & Guides</h3>
@@ -283,7 +230,7 @@
 
       <!-- Quick Preset Icon Buttons (Cube / Cuboid) -->
       <div style="margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <button id="btn-preset-cube" class="btn-mini" style="height: 30px; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+        <button id="btn-preset-cube" class="btn-preset">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
@@ -291,8 +238,8 @@
           </svg>
           Cube
         </button>
-        <button id="btn-preset-cuboid" class="btn-mini" style="height: 30px; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-          <svg viewBox="0 0 24 24" width="16" height="15" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button id="btn-preset-cuboid" class="btn-preset">
+          <svg viewBox="0 0 24 24" width="16" height="15" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 14.5V9.5a1.5 1.5 0 0 0-.75-1.3l-9-4.2a1.5 1.5 0 0 0-1.5 0l-9 4.2A1.5 1.5 0 0 0 1 9.5v5a1.5 1.5 0 0 0 .75 1.3l9 4.2a1.5 1.5 0 0 0 1.5 0l9-4.2a1.5 1.5 0 0 0 .75-1.3z"/>
             <polyline points="1.5 9 11.5 13.5 21.5 9"/>
             <line x1="11.5" y1="20" x2="11.5" y2="13.5"/>
@@ -751,6 +698,26 @@
     btnTheme.addEventListener('click', () => {
       const isDark = document.body.classList.contains('dark-theme');
       applyTheme(!isDark);
+    });
+
+    // ── Toggle Side Panels (How-to & Settings) ──
+    const btnPanels = document.getElementById('panels-toggle');
+    const panelsText = document.getElementById('panels-toggle-text');
+    const cardCurrent = document.getElementById('current-card');
+    const cardHow = document.getElementById('how-card');
+
+    let panelsVisible = true;
+    btnPanels.addEventListener('click', () => {
+      panelsVisible = !panelsVisible;
+      if (panelsVisible) {
+        cardCurrent.classList.remove('hidden-panel');
+        cardHow.classList.remove('hidden-panel');
+        panelsText.textContent = 'Hide Panels';
+      } else {
+        cardCurrent.classList.add('hidden-panel');
+        cardHow.classList.add('hidden-panel');
+        panelsText.textContent = 'Show Panels';
+      }
     });
 
     const updateLoop = () => {
