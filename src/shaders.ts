@@ -39,11 +39,11 @@ vec3 rotateToCam(vec3 p, vec3 r) {
   float y1 = p.y * cx - p.z * sx;
   float z1 = p.y * sx + p.z * cx;
 
-  // 2. Y-axis (Roll)
+  // 2. Y-axis (Roll: Z -> X, standard right-handed)
   float cy = cos(r.y), sy = sin(r.y);
-  float x2 = x1 * cy + z1 * sy;
+  float x2 = x1 * cy - z1 * sy;
   float y2 = y1;
-  float z2 = -x1 * sy + z1 * cy;
+  float z2 = x1 * sy + z1 * cy;
 
   // 3. Z-axis (Yaw)
   float cz = cos(r.z), sz = sin(r.z);
@@ -64,10 +64,10 @@ vec3 rotateToCam(vec3 p, vec3 r) {
 //   => y2 = -camX * sz + camY * cz
 //   z2 = camZ
 // 2. Inv Y-axis:
-//   x2 = x1 * cy + z1 * sy
-//   z2 = -x1 * sy + z1 * cy
-//   => x1 = x2 * cy - z2 * sy
-//   => z1 = x2 * sy + z2 * cy
+//   x2 = x1 * cy - z1 * sy
+//   z2 = x1 * sy + z1 * cy
+//   => x1 = x2 * cy + z2 * sy
+//   => z1 = -x2 * sy + z2 * cy
 //   y1 = y2
 // 3. Inv X-axis:
 //   x = x1
@@ -82,9 +82,9 @@ vec3 rotateToLocal(vec3 p, vec3 r) {
   float z2 =  p.z;
 
   float cy = cos(r.y), sy = sin(r.y);
-  float x1 = x2 * cy - z2 * sy;
+  float x1 = x2 * cy + z2 * sy;
   float y1 = y2;
-  float z1 = x2 * sy + z2 * cy;
+  float z1 = -x2 * sy + z2 * cy;
 
   float cx = cos(r.x), sx = sin(r.x);
   float x = x1;

@@ -95,9 +95,9 @@ export function createRoundedBoxPicker(
       const y2 = -p.x * sz + p.y * cz;
       const z2 =  p.z;
 
-      const x1 = x2 * cy - z2 * sy;
-      const y1 = y2;
-      const z1 = x2 * sy + z2 * cy;
+      const x1 =  x2 * cy + z2 * sy;
+      const y1 =  y2;
+      const z1 = -x2 * sy + z2 * cy;
 
       const x = x1;
       const y =  y1 * cx + z1 * sx;
