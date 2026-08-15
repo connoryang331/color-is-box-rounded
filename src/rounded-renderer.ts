@@ -496,8 +496,8 @@ export function renderRoundedBox(
       overlayCtx.arc(dotPos.x, dotPos.y, 6, 0, Math.PI * 2);
       overlayCtx.clip();
       const cs = 4;
-      for (let gy = -8; gy < 8; gy += cs) {
-        for (let gx = -8; gx < 8; gx += cs) {
+      for (let gy = -12; gy < 12; gy += cs) {
+        for (let gx = -12; gx < 12; gx += cs) {
           overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
           overlayCtx.fillRect(dotPos.x + gx, dotPos.y + gy, cs, cs);
         }
@@ -506,13 +506,13 @@ export function renderRoundedBox(
     }
 
     overlayCtx.beginPath();
-    overlayCtx.arc(dotPos.x, dotPos.y, 6, 0, Math.PI * 2);
+    overlayCtx.arc(dotPos.x, dotPos.y, 8, 0, Math.PI * 2);
     overlayCtx.fillStyle = alpha < 1
       ? `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`
       : `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
     overlayCtx.fill();
     overlayCtx.strokeStyle = outlineFor(finalRgb.r, finalRgb.g, finalRgb.b);
-    overlayCtx.lineWidth = 2;
+    overlayCtx.lineWidth = 2.5;
     overlayCtx.stroke();
   }
 
@@ -533,20 +533,23 @@ export function renderRoundedBox(
     overlayCtx.save();
     overlayCtx.globalAlpha = Math.min(1, ease + 0.15);
 
-    // Checkerboard filled across an annulus band — the classic "transparent" indicator.
-    const checkerBand = (r: number, w: number) => {
+    // Fine dot-grid texture across the band — the "transparent" indicator, matching the
+    // reference slider look (dotted track with the solid fill up to the current value).
+    const dotBand = (r: number, w: number) => {
       overlayCtx.save();
       overlayCtx.beginPath();
       overlayCtx.arc(anchorPt.x, anchorPt.y, r + w / 2, 0, Math.PI * 2);
       overlayCtx.arc(anchorPt.x, anchorPt.y, Math.max(0.5, r - w / 2), 0, Math.PI * 2, true);
       overlayCtx.closePath();
       overlayCtx.clip();
-      const cs = 6;
+      const step = 7;
       const rr = r + w / 2;
-      for (let gy = -rr; gy < rr; gy += cs) {
-        for (let gx = -rr; gx < rr; gx += cs) {
-          overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
-          overlayCtx.fillRect(anchorPt.x + gx, anchorPt.y + gy, cs, cs);
+      overlayCtx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+      for (let gy = -rr; gy < rr; gy += step) {
+        for (let gx = -rr; gx < rr; gx += step) {
+          overlayCtx.beginPath();
+          overlayCtx.arc(anchorPt.x + gx, anchorPt.y + gy, 1.8, 0, Math.PI * 2);
+          overlayCtx.fill();
         }
       }
       overlayCtx.restore();
@@ -607,17 +610,36 @@ export function renderRoundedBox(
     overlayCtx.stroke();
     bandEdges(rSat, wRing, ring.band === 'sat');
 
-    // OUTER ring — ALPHA: checkerboard track (standard transparency-bar look in ring form);
-    // the value arc is the color at its alpha over the checkerboard, so the arc itself shows
-    // the exact result and the empty arc reads as fully transparent.
-    checkerBand(rAlp, wRing);
+    // OUTER ring — ALPHA: dotted track (the transparent indicator) with the value arc drawn
+    // as the SOLID color up to the current alpha — exactly the reference slider look. The
+    // center plate shows the actual translucency; a thumb knob marks the current value.
+    dotBand(rAlp, wRing);
     const alphaEnd = start + alpha * Math.PI * 2;
     if (alpha > 0.001) {
       overlayCtx.beginPath();
       overlayCtx.arc(anchorPt.x, anchorPt.y, rAlp, start, alphaEnd);
       overlayCtx.lineWidth = wRing;
-      overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`;
+      overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
       overlayCtx.stroke();
+      // Thumb knob at the arc end (like the reference slider): a color ring with a white core
+      // and a small color dot, outlined for contrast — marks the current alpha position.
+      // alphaEnd is a canvas angle (0 = 3 o'clock, y down), so x uses cos and y uses +sin.
+      const kx = anchorPt.x + rAlp * Math.cos(alphaEnd);
+      const ky = anchorPt.y + rAlp * Math.sin(alphaEnd);
+      overlayCtx.beginPath();
+      overlayCtx.arc(kx, ky, 9, 0, Math.PI * 2);
+      overlayCtx.fillStyle = '#ffffff';
+      overlayCtx.fill();
+      overlayCtx.lineWidth = 4.5;
+      overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+      overlayCtx.stroke();
+      overlayCtx.lineWidth = 1;
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+      overlayCtx.stroke();
+      overlayCtx.beginPath();
+      overlayCtx.arc(kx, ky, 3, 0, Math.PI * 2);
+      overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+      overlayCtx.fill();
     }
     bandEdges(rAlp, wRing, ring.band === 'alpha');
     ringLabel('SAT', rAlp, ring.band === 'sat');

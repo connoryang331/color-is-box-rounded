@@ -328,7 +328,7 @@ export function createRoundedBoxPicker(
   const hitDot = (clientX: number, clientY: number): boolean => {
     const p = toCanvas(clientX, clientY);
     const d = dotScreenPos();
-    return Math.hypot(p.x - d.x, p.y - d.y) <= 14;
+    return Math.hypot(p.x - d.x, p.y - d.y) <= 17; // dot radius is 8 + stroke
   };
 
   const setAlphaInternal = (v: number) => {
