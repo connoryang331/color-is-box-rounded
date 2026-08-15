@@ -129,8 +129,8 @@ void main() {
   vec2 camXY = vec2(screenPos.x, screenPos.y) / scaleFactor;
 
   vec3 halfSize = u_box_size * 0.5;
-  float maxR = min(min(halfSize.x, halfSize.y), halfSize.z) * 0.45;
-  float rad = clamp(u_radius, 0.001, maxR);
+  float minDimension = min(min(halfSize.x, halfSize.y), halfSize.z);
+  float rad = clamp(u_radius, 0.0, minDimension * 0.999);
 
   // Orthographic ray pointing down positive Z (into screen / depth)
   vec3 rayOrigin = vec3(camXY, -5.0);

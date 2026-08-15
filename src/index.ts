@@ -147,7 +147,7 @@ export function createRoundedBoxPicker(
     },
     getDimensions: () => ({ sizeX: box.sizeX, sizeY: box.sizeY, sizeZ: box.sizeZ }),
     setRadius: (r: number) => {
-      box.radius = Math.max(0.001, Math.min(0.25, r));
+      box.radius = Math.max(0.0, Math.min(0.50, r));
       scheduleRender();
     },
     getRadius: () => box.radius,

@@ -565,7 +565,7 @@
 
     const sRadius = makeGenericSlider('slider-radius', 'v-radius', () => picker.getRadius(), (v) => {
       picker.setRadius(v);
-    }, 0.001, 0.25, '', 2);
+    }, 0.0, 0.50, '', 2);
 
     const sX = initBlenderSlider('slider-rot-x', 'v-rot-x', 'x', -180, 180);
     const sY = initBlenderSlider('slider-rot-y', 'v-rot-y', 'y', -180, 180);
