@@ -3,7 +3,7 @@ import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D, transform3D, projectSaturationTriangle, SaturationTriangle } from './camera-math';
 import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
-import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb } from './color-math';
+import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb, ringColorAt } from './color-math';
 
 /** Radius (band center) of the inner (alpha) ring around the pick dot, in canvas px. */
 export const RING_INNER_R = 30;
@@ -13,6 +13,20 @@ export const RING_INNER_W = 12;
 export const RING_OUTER_R = 56;
 /** Band width of the outer (saturation) ring, in canvas px. */
 export const RING_OUTER_W = 16;
+
+/** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
+export interface RingState {
+  /** Screen-space ring center (the dot position at press). */
+  anchor: Vec2;
+  /** 0..1 unfold / fold animation. */
+  reveal: number;
+  /** Which ring the pointer currently sits in (highlighted). */
+  band: 'sat' | 'alpha' | null;
+  /** Color captured at press — the gradient's C vertex (top of the saturation ring). */
+  colorAnchor: Vec3 | null;
+  /** Current marker angle in radians, clockwise from 12 o'clock. */
+  angle: number;
+}
 
 export interface WebGLRenderContext {
   gl: WebGLRenderingContext;
@@ -265,9 +279,7 @@ export function renderRoundedBox(
   svMix: { a: number; b: number; g: number } | null,
   svShow: boolean,
   svReveal: number,
-  ringAnchor: Vec2 | null,
-  ringReveal: number,
-  ringBand: 'sat' | 'alpha' | null,
+  ring: RingState | null,
   alpha: number,
 ): void {
   const { gl, overlayCtx, width, height, program, uniforms } = rc;
@@ -503,15 +515,15 @@ export function renderRoundedBox(
   // 2.3 Alpha / Saturation rings (pressed pick dot): outer = saturation (HSV S), inner = alpha.
   // Rotation around the anchor sets the value (0 at 12 o'clock, clockwise); the pointer's
   // radial band picks the active ring (highlighted). Rings scale in with the reveal animation.
-  if (ringAnchor && ringReveal > 0.01) {
-    const ease = ringReveal < 0.5 ? 2 * ringReveal * ringReveal : 1 - Math.pow(-2 * ringReveal + 2, 2) / 2;
+  if (ring && ring.reveal > 0.01) {
+    const anchorPt = ring.anchor;
+    const ease = ring.reveal < 0.5 ? 2 * ring.reveal * ring.reveal : 1 - Math.pow(-2 * ring.reveal + 2, 2) / 2;
     const rIn = RING_INNER_R * ease;
     const rOut = RING_OUTER_R * ease;
     const wIn = RING_INNER_W * ease;
     const wOut = RING_OUTER_W * ease;
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
-    const hsb = rgbToHsb(finalRgb);
     const start = -Math.PI / 2; // 12 o'clock = 0%
 
     overlayCtx.save();
@@ -521,8 +533,8 @@ export function renderRoundedBox(
     const checkerBand = (r: number, w: number) => {
       overlayCtx.save();
       overlayCtx.beginPath();
-      overlayCtx.arc(ringAnchor.x, ringAnchor.y, r + w / 2, 0, Math.PI * 2);
-      overlayCtx.arc(ringAnchor.x, ringAnchor.y, Math.max(0.5, r - w / 2), 0, Math.PI * 2, true);
+      overlayCtx.arc(anchorPt.x, anchorPt.y, r + w / 2, 0, Math.PI * 2);
+      overlayCtx.arc(anchorPt.x, anchorPt.y, Math.max(0.5, r - w / 2), 0, Math.PI * 2, true);
       overlayCtx.closePath();
       overlayCtx.clip();
       const cs = 6;
@@ -530,7 +542,7 @@ export function renderRoundedBox(
       for (let gy = -rr; gy < rr; gy += cs) {
         for (let gx = -rr; gx < rr; gx += cs) {
           overlayCtx.fillStyle = (((gx + gy) / cs) % 2) === 0 ? '#cbd5e1' : '#f1f5f9';
-          overlayCtx.fillRect(ringAnchor.x + gx, ringAnchor.y + gy, cs, cs);
+          overlayCtx.fillRect(anchorPt.x + gx, anchorPt.y + gy, cs, cs);
         }
       }
       overlayCtx.restore();
@@ -543,15 +555,15 @@ export function renderRoundedBox(
       for (const rr of [r - w / 2, r + w / 2]) {
         if (rr <= 0) continue;
         overlayCtx.beginPath();
-        overlayCtx.arc(ringAnchor.x, ringAnchor.y, rr, 0, Math.PI * 2);
+        overlayCtx.arc(anchorPt.x, anchorPt.y, rr, 0, Math.PI * 2);
         overlayCtx.stroke();
       }
     };
 
     // Ring label above 12 o'clock, bold with a dark outline so it reads over any face color
     const ringLabel = (text: string, r: number, w: number, active: boolean) => {
-      const x = ringAnchor.x;
-      const y = ringAnchor.y - (r + w / 2) - 2;
+      const x = anchorPt.x;
+      const y = anchorPt.y - (r + w / 2) - 2;
       overlayCtx.font = '700 12px ui-monospace, SF Mono, monospace';
       overlayCtx.textAlign = 'center';
       overlayCtx.textBaseline = 'alphabetic';
@@ -562,23 +574,35 @@ export function renderRoundedBox(
       overlayCtx.fillText(text, x, y);
     };
 
-    // Outer ring — SATURATION: neutral track, solid-color value arc (0 at 12 o'clock, clockwise)
-    const sat = hsb.s / 100;
-    overlayCtx.beginPath();
-    overlayCtx.arc(ringAnchor.x, ringAnchor.y, rOut, 0, Math.PI * 2);
-    overlayCtx.lineWidth = wOut;
-    overlayCtx.strokeStyle = 'rgba(100, 116, 139, 0.5)';
-    overlayCtx.stroke();
-    const satEnd = start + sat * Math.PI * 2;
-    if (sat > 0.001) {
+    // Outer ring — SATURATION: the C / white / black triangle perimeter wrapped into a ring
+    // (top = anchor color, right = black, bottom = gray, left = white). Dragging around it sets
+    // the color to the ring color at the pointer angle (hue preserved). A marker dot shows the
+    // current position on the ring.
+    const anchorValues = ring.colorAnchor || dotValues;
+    const anchorRgb = valuesToRgb(anchorValues, mode);
+    const nSeg = 72;
+    const segStep = (Math.PI * 2) / nSeg;
+    for (let i = 0; i < nSeg; i++) {
+      const a0 = start + i * segStep;
+      const col = ringColorAt(anchorRgb, i * segStep);
       overlayCtx.beginPath();
-      overlayCtx.arc(ringAnchor.x, ringAnchor.y, rOut, start, satEnd);
+      overlayCtx.arc(anchorPt.x, anchorPt.y, rOut, a0, a0 + segStep + 0.012); // tiny overlap hides seam gaps
       overlayCtx.lineWidth = wOut;
-      overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+      overlayCtx.lineCap = 'butt';
+      overlayCtx.strokeStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
       overlayCtx.stroke();
     }
-    bandEdges(rOut, wOut, ringBand === 'sat');
-    ringLabel('SAT', rOut, wOut, ringBand === 'sat');
+    const mkx = anchorPt.x + rOut * Math.sin(ring.angle);
+    const mky = anchorPt.y - rOut * Math.cos(ring.angle);
+    overlayCtx.beginPath();
+    overlayCtx.arc(mkx, mky, 4, 0, Math.PI * 2);
+    overlayCtx.fillStyle = '#ffffff';
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.75)';
+    overlayCtx.lineWidth = 1.4;
+    overlayCtx.stroke();
+    bandEdges(rOut, wOut, ring.band === 'sat');
+    ringLabel('SAT', rOut, wOut, ring.band === 'sat');
 
     // Inner ring — ALPHA: checkerboard track (standard transparency-bar look in ring form);
     // the value arc is the color at its alpha over the checkerboard, so the arc itself shows
@@ -587,13 +611,13 @@ export function renderRoundedBox(
     const alphaEnd = start + alpha * Math.PI * 2;
     if (alpha > 0.001) {
       overlayCtx.beginPath();
-      overlayCtx.arc(ringAnchor.x, ringAnchor.y, rIn, start, alphaEnd);
+      overlayCtx.arc(anchorPt.x, anchorPt.y, rIn, start, alphaEnd);
       overlayCtx.lineWidth = wIn;
       overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`;
       overlayCtx.stroke();
     }
-    bandEdges(rIn, wIn, ringBand === 'alpha');
-    ringLabel('A', rIn, wIn, ringBand === 'alpha');
+    bandEdges(rIn, wIn, ring.band === 'alpha');
+    ringLabel('A', rIn, wIn, ring.band === 'alpha');
 
     overlayCtx.restore();
   }

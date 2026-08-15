@@ -209,6 +209,36 @@ export function rgbToValues(rgb: RGBColor, mode: ColorMode): Vec3 {
   }
 }
 
+/**
+ * Color on the saturation ring at the given angle (radians, clockwise from 12 o'clock).
+ * The ring is the C / white / black triangle's perimeter wrapped into a circle:
+ *   top (0) = the anchor color C · right (π/2) = black · bottom (π) = gray · left (3π/2) = white.
+ * Linear RGB interpolation along each edge, so the hue is preserved (same as the triangle).
+ */
+export function ringColorAt(anchor: RGBColor, angleRad: number): RGBColor {
+  let deg = ((angleRad * 180) / Math.PI) % 360;
+  if (deg < 0) deg += 360;
+  const nr = anchor.r / 255;
+  const ng = anchor.g / 255;
+  const nb = anchor.b / 255;
+  let r: number, g: number, b: number;
+  if (deg <= 90) {
+    // C → black (darken)
+    const t = deg / 90;
+    r = nr * (1 - t); g = ng * (1 - t); b = nb * (1 - t);
+  } else if (deg <= 270) {
+    // black → white (gray axis)
+    const t = (deg - 90) / 180;
+    r = t; g = t; b = t;
+  } else {
+    // white → C (lighten back)
+    const t = (deg - 270) / 90;
+    r = t * nr + (1 - t); g = t * ng + (1 - t); b = t * nb + (1 - t);
+  }
+  const to255 = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 255);
+  return { r: to255(r), g: to255(g), b: to255(b) };
+}
+
 /** Get raw channel values from normalized values. */
 export function valuesToChannels(values: Vec3, mode: ColorMode): [number, number, number] {
   const max = AXIS_MAX[mode];

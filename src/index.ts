@@ -4,7 +4,7 @@ import type {
 } from './types';
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle } from './camera-math';
-import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, hsbToRgb } from './color-math';
+import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, ringColorAt } from './color-math';
 import { initWebGL, renderRoundedBox, RING_INNER_R, RING_INNER_W, RING_OUTER_R, RING_OUTER_W } from './rounded-renderer';
 
 export interface RoundedBoxOptions {
@@ -120,6 +120,15 @@ export function createRoundedBoxPicker(
   let isRingDrag = false;
   let ringAnchor: Vec2 | null = null;      // screen-space ring center (dot position at press)
   let ringBand: 'sat' | 'alpha' | null = null;
+  // Angular hysteresis: the pointer must rotate ~10° inside a band before that ring engages.
+  // Reaching the outer ring passes THROUGH the inner band radially, which doesn't rotate the
+  // pointer — so crossing never accidentally changes alpha; once engaged, fine rotation applies.
+  let ringBandStartAngle = 0;
+  let ringEngaged = false;
+  // The saturation ring is the C / white / black triangle perimeter wrapped into a circle:
+  // top = anchor color, right = black, bottom = gray, left = white (hue preserved).
+  let ringColorAnchor: Vec3 | null = null; // color captured at press (the ring's C vertex)
+  let ringAngle = 0;                       // current marker angle, radians clockwise from 12 o'clock
   let ringReveal = 0;
   let ringRevealTarget = 0;
   let ringAnimFrame: number | null = null;
@@ -151,7 +160,9 @@ export function createRoundedBoxPicker(
   const scheduleRender = () => {
     if (animId !== null) return;      animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal, ringAnchor, ringReveal, ringBand, alpha);
+      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
+        ringAnchor ? { anchor: ringAnchor, reveal: ringReveal, band: ringBand, colorAnchor: ringColorAnchor, angle: ringAngle } : null,
+        alpha);
     });
   };
 
@@ -311,27 +322,28 @@ export function createRoundedBoxPicker(
     return Math.hypot(p.x - d.x, p.y - d.y) <= 14;
   };
 
-  // Inner ring: alpha (0..1). Outer ring: saturation via HSV S (hue + lightness kept).
   const setAlphaInternal = (v: number) => {
     alpha = Math.max(0, Math.min(1, v));
     notify();
     scheduleRender();
   };
-  const setSaturationInternal = (v: number) => {
-    const rgb = valuesToRgb(dotValues, mode);
-    const hsb = rgbToHsb(rgb);
-    hsb.s = Math.max(0, Math.min(100, v * 100));
-    dotValues = rgbToValues(hsbToRgb(hsb), mode);
-    notify();
-    scheduleRender();
-  };
-  // Angle (0..1, 0 at 12 o'clock, clockwise) of the pointer around the ring anchor.
-  const ringValueAt = (p: Vec2): number => {
+  // Pointer angle around the ring anchor, radians clockwise from 12 o'clock [0, 2π).
+  const ringAngleAt = (p: Vec2): number => {
     const dx = p.x - ringAnchor!.x;
     const dy = p.y - ringAnchor!.y;
     let ang = Math.atan2(dx, -dy);
-    if (ang < 0) ang += TWO_PI;
-    return ang / TWO_PI;
+    return ang < 0 ? ang + TWO_PI : ang;
+  };
+  // Alpha fraction (0..1) from the pointer angle.
+  const ringValueAt = (p: Vec2): number => ringAngleAt(p) / TWO_PI;
+  // Outer ring: set the color to the saturation-ring color at the pointer angle
+  // (anchor color → black → white → anchor, hue preserved).
+  const applyRingAngle = (ang: number) => {
+    ringAngle = ang;
+    const anchorRgb = valuesToRgb(ringColorAnchor || dotValues, mode);
+    dotValues = rgbToValues(ringColorAt(anchorRgb, ang), mode);
+    notify();
+    scheduleRender();
   };
 
   // Saturation triangle: barycentric weights (a,b,g) of the pointer inside the projected
@@ -401,6 +413,8 @@ export function createRoundedBoxPicker(
         isRingDrag = true;
         ringAnchor = dotScreenPos();
         ringBand = null;
+        ringColorAnchor = { ...dotValues };
+        ringAngle = 0;
         svAnchor = null;
         svMix = null;
         e.preventDefault();
@@ -439,11 +453,24 @@ export function createRoundedBoxPicker(
       const outBand = Math.abs(dist - rOut) <= (RING_OUTER_W * eReveal) / 2 + 2;
       const inBand = Math.abs(dist - rIn) <= (RING_INNER_W * eReveal) / 2 + 2;
       const band: 'alpha' | 'sat' | null = outBand ? 'sat' : inBand ? 'alpha' : null;
-      ringBand = band;
+      if (band !== ringBand) {
+        ringBand = band;
+        ringBandStartAngle = band ? ringAngleAt(p) : 0;
+        ringEngaged = false;
+      }
       if (band) {
-        const v = ringValueAt(p);
-        if (band === 'alpha') setAlphaInternal(v);
-        else setSaturationInternal(v);
+        const ang = ringAngleAt(p);
+        if (!ringEngaged) {
+          let delta = Math.abs(ang - ringBandStartAngle);
+          if (delta > Math.PI) delta = TWO_PI - delta; // wrap-around
+          if (delta > 10 * DEG) ringEngaged = true;
+        }
+        if (ringEngaged) {
+          if (band === 'alpha') setAlphaInternal(ang / TWO_PI);
+          else applyRingAngle(ang);
+        } else {
+          scheduleRender();
+        }
       } else {
         scheduleRender();
       }
@@ -469,6 +496,10 @@ export function createRoundedBoxPicker(
     if (isRingDrag) {
       isRingDrag = false;
       ringBand = null;
+      ringBandStartAngle = 0;
+      ringEngaged = false;
+      ringColorAnchor = null;
+      ringAngle = 0;
       animateRing(0);
     }
     if (isSVDrag) {
