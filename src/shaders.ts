@@ -45,23 +45,40 @@ vec3 rotateToCam(vec3 p, vec3 r) {
 }
 
 // Inverse rotation from Cam space back to Local box space
+// Mathematically exact inverse of transform3D:
+// p_cam = Rx * [ Ry * (Rz * p_local) ]
+// 1. Inv X-axis:
+//   camY = z2 * cx - y2 * sx
+//   camZ = z2 * sx + y2 * cx
+//   => y2 = -camY * sx + camZ * cx
+//   => z2 =  camY * cx + camZ * sx
+//   x2 = camX
+// 2. Inv Y-axis:
+//   x2 = x1 * cy + z1 * sy
+//   z2 = -x1 * sy + z1 * cy
+//   => x1 = x2 * cy - z2 * sy
+//   => z1 = x2 * sy + z2 * cy
+//   y1 = y2
+// 3. Inv Z-axis:
+//   x1 = x * cz - y * sz
+//   y1 = x * sz + y * cz
+//   => x = x1 * cz + y1 * sz
+//   => y = -x1 * sz + y1 * cz
+//   z = z1
 vec3 rotateToLocal(vec3 p, vec3 r) {
-  // 1. Inv X-axis (Pitch)
-  float cx = cos(-r.x), sx = sin(-r.x);
+  float cx = cos(r.x), sx = sin(r.x);
   float x2 = p.x;
-  float z2 = p.y * cx + p.z * sx;
   float y2 = -p.y * sx + p.z * cx;
+  float z2 =  p.y * cx + p.z * sx;
 
-  // 2. Inv Y-axis (Roll)
-  float cy = cos(-r.y), sy = sin(-r.y);
-  float x1 = x2 * cy + z2 * sy;
+  float cy = cos(r.y), sy = sin(r.y);
+  float x1 = x2 * cy - z2 * sy;
   float y1 = y2;
-  float z1 = -x2 * sy + z2 * cy;
+  float z1 = x2 * sy + z2 * cy;
 
-  // 3. Inv Z-axis (Yaw)
-  float cz = cos(-r.z), sz = sin(-r.z);
-  float x = x1 * cz - y1 * sz;
-  float y = x1 * sz + y1 * cz;
+  float cz = cos(r.z), sz = sin(r.z);
+  float x =  x1 * cz + y1 * sz;
+  float y = -x1 * sz + y1 * cz;
   float z = z1;
 
   return vec3(x, y, z);
