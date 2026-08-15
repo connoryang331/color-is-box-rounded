@@ -170,10 +170,52 @@
     background: var(--bg-btn-hover);
     color: var(--text-val);
   }
-  .btn-mini-icon.active {
-    background: #007AFF;
-    border-color: #007AFF;
-    color: #fff;
+  /* Pure Zen Mode (Hide all UI except 3D Cube Canvas) */
+  body.zen-mode .top-navbar,
+  body.zen-mode #current-card,
+  body.zen-mode #how-card,
+  body.zen-mode #bottom-color-card,
+  body.zen-mode .subtitle {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(12px);
+    transition: opacity 0.25s, transform 0.25s;
+  }
+
+  /* Bottom Hover Zen Toggle Trigger Bar */
+  .bottom-zen-wrapper {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    pointer-events: auto;
+  }
+  .zen-hover-btn {
+    opacity: 0.12;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-panel);
+    box-shadow: var(--shadow-panel);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-title);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.2s, transform 0.2s, background 0.2s;
+    user-select: none;
+  }
+  .bottom-zen-wrapper:hover .zen-hover-btn,
+  .zen-hover-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-4px);
   }
 </style>
 </head>
@@ -236,7 +278,7 @@
       </div>
 
       <!-- 3D Box Dimensions (长方体三轴独立拉伸、视角缩放与倒角控制) -->
-      <div class="row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e5e7eb;">
+      <div class="row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--border-dashed);">
         <span class="label" style="color: #ef4444;">SIZE X</span>
         <div class="blender-slider rot-x" id="slider-size-x">
           <div class="bar"></div>
@@ -257,7 +299,8 @@
           <input type="text" id="v-size-z" value="1.00">
         </div>
       </div>
-      <div class="row">
+      <!-- Divider above ZOOM -->
+      <div class="row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--border-dashed);">
         <span class="label" style="color: #6366f1;">ZOOM</span>
         <div class="blender-slider" id="slider-zoom">
           <div class="bar" style="background: #6366f1; opacity: 0.22;"></div>
@@ -368,7 +411,7 @@
     <div class="panel-holder"><div id="holder"></div></div>
     
     <!-- Vertical Aligned Gray Values & Enriched 3D Current Color Preview Cube -->
-    <div style="display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 18px;">
+    <div id="bottom-color-card" style="display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 18px; transition: opacity 0.2s, transform 0.2s;">
       <!-- Big 3D Current Color Preview Cube aligned with the 4 text lines -->
       <div style="display: flex; align-items: center; justify-content: center;">
         <svg viewBox="0 0 24 24" width="76" height="76" style="filter: drop-shadow(0 4px 10px rgba(0,0,0,0.12));">
@@ -394,6 +437,16 @@
     </div>
 
     <p class="subtitle" style="margin-top: 12px;">Real 3D GPU Bevel & Raymarching RGB Color Picker</p>
+  </div>
+
+  <!-- Bottom Hover Button to Toggle Pure Zen Mode (Hide all UI) -->
+  <div class="bottom-zen-wrapper">
+    <button id="zen-toggle" class="zen-hover-btn" title="Toggle Pure Zen Mode (Hide all UI & Panels)">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+      </svg>
+      <span id="zen-toggle-text">Zen View</span>
+    </button>
   </div>
 
   <div class="panel-info" id="how-card">
@@ -771,6 +824,14 @@
         cardHow.classList.add('hidden-panel');
         panelsText.textContent = 'Show Panels';
       }
+    });
+
+    // ── Pure Zen Mode Toggle (Hide All UI & Focus purely on 3D Box) ──
+    const btnZen = document.getElementById('zen-toggle');
+    const zenText = document.getElementById('zen-toggle-text');
+    btnZen.addEventListener('click', () => {
+      const isZen = document.body.classList.toggle('zen-mode');
+      zenText.textContent = isZen ? 'Exit Zen' : 'Zen View';
     });
 
     const updateLoop = () => {
