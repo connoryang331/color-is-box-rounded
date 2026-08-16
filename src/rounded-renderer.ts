@@ -496,10 +496,8 @@ export function renderRoundedBox(
   };
 
   // 2.2 Draw Pick Dot
-  // Skipped while the triangle marker is active: the marker (a·C + b·W + g·K projection) lands
-  // exactly on the pick dot (barycentric coords are preserved by the orthographic projection),
-  // so the marker doubles as the position indicator for the current color.
-  if (dotVisible && !svMix && !ring) {
+  // Skipped while the triangle marker, rings, or 3D Cube SAT is active
+  if (dotVisible && !svMix && !ring && (!cubeSat || cubeSat.reveal <= 0.01)) {
     const dotPos = project3D(dotValues, scale, center, cam, box);
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
@@ -860,6 +858,9 @@ export function renderRoundedBox(
     const u = cubeSat.currentCoord.x; // [0, 1]
     const v = cubeSat.currentCoord.y; // [0, 1]
     const w = cubeSat.currentCoord.z; // [0, 1]
+
+    const curRgb = valuesToRgb(dotValues, mode);
+    const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
     // Screen position mapped inside the isometric cube volume:
     // Lerp on the front corner:

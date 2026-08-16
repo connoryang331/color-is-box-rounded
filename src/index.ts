@@ -504,6 +504,9 @@ export function createRoundedBoxPicker(
     if (e.button === 1) e.preventDefault();
   });
 
+  // Current adjusted color while tuning in 3D Cube SAT
+  let cubeSatCurrentColor: RGBColor | null = null;
+
   // Helper to apply 3D Cube SAT coordinate (u, v, w) to color
   const applyCubeSatCoord = (u: number, v: number, w: number) => {
     if (!cubeSatColorAnchor) return;
@@ -532,8 +535,19 @@ export function createRoundedBoxPicker(
       newRgb = oklchToRgb({ l: v, c: u * 0.35, h: w * 359 });
     }
 
-    dotValues = rgbToValues(newRgb, mode);
-    notify();
+    cubeSatCurrentColor = newRgb;
+    const finalRgb = invert ? { r: 255 - newRgb.r, g: 255 - newRgb.g, b: 255 - newRgb.b } : newRgb;
+    const hsb = rgbToHsb(finalRgb);
+    const oklch = rgbToOklch(finalRgb);
+    const hex = alpha < 1 ? alphaHex(finalRgb, alpha) : rgbToHex(finalRgb);
+    const out: ColorOutput = {
+      rgb: finalRgb,
+      hsb,
+      oklch,
+      hex,
+      alpha,
+    };
+    listeners.forEach(cb => cb(out));
     scheduleRender();
   };
 
@@ -638,6 +652,11 @@ export function createRoundedBoxPicker(
       isCubeSatDrag = false;
       cubeSatOpened = false;
       cubeSatPressPt = null;
+      if (cubeSatCurrentColor) {
+        dotValues = rgbToValues(cubeSatCurrentColor, mode);
+        cubeSatCurrentColor = null;
+        notify();
+      }
       cubeSatColorAnchor = null;
       animateCubeSat(0);
     }
