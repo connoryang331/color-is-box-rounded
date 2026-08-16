@@ -571,55 +571,93 @@ export function createRoundedBoxPicker(
         }
         return;
       }
-      // Dragging inside 3D Cube SAT: calculate cursor position relative to anchor & map across 3 visible facets
+      // 3D Perspective Projection for Cube SAT (identical parameters to renderer):
       const s = 140;
       const radYaw = -33 * Math.PI / 180;
       const radPitch = 19 * Math.PI / 180;
       const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
       const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
+      const ax = cubeSatAnchor.x;
+      const ay = cubeSatAnchor.y;
 
-      // Normalized 2D vector from popup center:
-      const sx = (p.x - cubeSatAnchor.x) / (s * 0.44);
-      const syScreen = -(p.y - cubeSatAnchor.y) / (s * 0.44); // Canvas Y up
+      const proj = (px: number, py: number, pz: number): Vec2 => {
+        const x1 = px * cy + pz * sy;
+        const y1 = py;
+        const z1 = -px * sy + pz * cy;
+        const x2 = x1;
+        const y2 = y1 * cp - z1 * sp;
+        return {
+          x: ax + x2 * s * 0.44,
+          y: ay - y2 * s * 0.44,
+        };
+      };
 
-      // Screen positions for the 3 face centers:
-      // Top face: syScreen > 0.05
-      // Left face: sx <= 0.0
-      // Right face: sx > 0.0
+      const T_back  = proj(-1,  1, -1);
+      const T_left  = proj(-1,  1,  1);
+      const T_right = proj( 1,  1, -1);
+      const T_front = proj( 1,  1,  1);
+      const B_left  = proj(-1, -1,  1);
+      const B_right = proj( 1, -1, -1);
+      const B_front = proj( 1, -1,  1);
 
-      // Invert 3D system:
-      // Top face (Y = 1):
-      const zPrimeTop = (cp - syScreen) / (sp || 0.001);
-      const xTop = sx * cy - zPrimeTop * sy;
-      const zTop = sx * sy + zPrimeTop * cy;
+      // Triangle test & barycentric helper:
+      const bary = (pt: Vec2, a: Vec2, b: Vec2, c: Vec2) => {
+        const denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+        if (Math.abs(denom) < 1e-5) return { u: -1, v: -1, w: -1, inside: false };
+        const u = ((b.y - c.y) * (pt.x - c.x) + (c.x - b.x) * (pt.y - c.y)) / denom;
+        const v = ((c.y - a.y) * (pt.x - c.x) + (a.x - c.x) * (pt.y - c.y)) / denom;
+        const w = 1 - u - v;
+        const inside = u >= -0.05 && v >= -0.05 && w >= -0.05;
+        return { u, v, w, inside };
+      };
 
-      // Left face (X = -1):
-      const zLeft = (sx + cy) / (sy || -0.001);
-      const yLeft = (syScreen + (sy + zLeft * cy) * sp) / (cp || 0.001);
+      // 1. Check Top Face Quad: Tri1(T_back, T_right, T_front) + Tri2(T_back, T_front, T_left)
+      const topT1 = bary(p, T_back, T_right, T_front);
+      const topT2 = bary(p, T_back, T_front, T_left);
 
-      // Right face (front/right side: Y in [-1,1], X in [-1,1], Z = -X*sy/cy + ...):
-      // On screen, right face is spanned by (T_front, T_right, B_right, B_front)
-      // Normal projection:
-      const xRight = (sx - sy * 0.5) / (cy || 0.8);
-      const yRight = (syScreen + sp * 0.5) / (cp || 0.9);
+      // 2. Check Left Face Quad: Tri1(T_left, T_front, B_front) + Tri2(T_left, B_front, B_left)
+      const leftT1 = bary(p, T_left, T_front, B_front);
+      const leftT2 = bary(p, T_left, B_front, B_left);
+
+      // 3. Check Right Face Quad: Tri1(T_front, T_right, B_right) + Tri2(T_front, B_right, B_front)
+      const rightT1 = bary(p, T_front, T_right, B_right);
+      const rightT2 = bary(p, T_front, B_right, B_front);
 
       let u = 0.5, v = 0.5, w = 0.5;
 
-      if (syScreen > 0.12 && xTop >= -1.2 && xTop <= 1.2 && zTop >= -1.2 && zTop <= 1.2) {
-        // Top Face (cold <-> warm on X, saturation/depth on Z, full brightness)
-        u = Math.max(0, Math.min(1, (xTop + 1) / 2));
-        v = Math.max(0, Math.min(1, (zTop + 1) / 2));
+      if (topT1.inside || topT2.inside || p.y < T_front.y) {
+        // --- TOP FACE ---
+        // Projected span on Top Face:
+        // Left-right axis along (T_left -> T_right)
+        // Depth axis along (T_back -> T_front)
+        const dxTop = (p.x - ax) / (s * 0.44);
+        const dyTop = (ay - p.y) / (s * 0.44);
+        // Map to u (temperature / cold-warm) and v (saturation)
+        u = Math.max(0, Math.min(1, 0.5 + dxTop * 0.7));
+        v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
         w = 1.0;
-      } else if (sx <= 0.0) {
-        // Left Face (dark shadow face)
+      } else if (p.x <= T_front.x) {
+        // --- LEFT FACE (Dark shadow face) ---
+        // Vertical Y along (T_left/T_front -> B_left/B_front): down is 0 (pure black), up is 1
+        const yTopAvg = (T_left.y + T_front.y) / 2;
+        const yBotAvg = (B_left.y + B_front.y) / 2;
+        const vertFraction = (yBotAvg - p.y) / (yBotAvg - yTopAvg || 1); // 0 at bottom, 1 at top
+        const horizFraction = (p.x - B_left.x) / (B_front.x - B_left.x || 1);
+
         u = 0.0;
-        v = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, zLeft)) + 1) / 2));
-        w = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yLeft)) + 1) / 2));
+        v = Math.max(0, Math.min(1, horizFraction));
+        w = Math.max(0, Math.min(1, vertFraction)); // w -> 0 reaches pure black smoothly
       } else {
-        // Right Face (bright highlight face)
-        u = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, xRight)) + 1) / 2));
-        v = Math.max(0, Math.min(1, 0.5 + (sx - syScreen) * 0.3));
-        w = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yRight)) + 1) / 2));
+        // --- RIGHT FACE (Bright highlight face) ---
+        // Right face spans from T_front/B_front to T_right/B_right
+        const yTopAvg = (T_front.y + T_right.y) / 2;
+        const yBotAvg = (B_front.y + B_right.y) / 2;
+        const vertFraction = (yBotAvg - p.y) / (yBotAvg - yTopAvg || 1);
+        const horizFraction = (p.x - T_front.x) / (T_right.x - T_front.x || 1);
+
+        u = Math.max(0, Math.min(1, horizFraction));
+        v = Math.max(0, Math.min(1, 0.5 + horizFraction * 0.5));
+        w = Math.max(0, Math.min(1, vertFraction));
       }
 
       cubeSatPointerPos = p;
