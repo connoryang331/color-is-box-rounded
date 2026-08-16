@@ -664,6 +664,8 @@ export function renderRoundedBox(
     const wAlpha = 18;
     const alphaStart = -Math.PI / 2; // 12 o'clock
 
+    let ax = cubeSat.anchor.x;
+    let ay = cubeSat.anchor.y;
     const safeMargin = rAlpha + wAlpha / 2 + 10;
     ax = Math.max(safeMargin, Math.min(width - safeMargin, ax));
     ay = Math.max(safeMargin, Math.min(height - safeMargin, ay));
