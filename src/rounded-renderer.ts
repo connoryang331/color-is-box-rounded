@@ -14,6 +14,9 @@ export const RING_MID_GAP = 8;
 /** Band width of BOTH rings, in canvas px. */
 export const RING_W = 16;
 
+const easeInOutQuad = (t: number): number =>
+  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
 /** Visible state of the 3D Cube SAT popup (passed to the renderer each frame). */
 export interface CubeSatState {
   anchor: Vec2;           // Screen center of the popup
