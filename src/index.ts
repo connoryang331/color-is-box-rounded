@@ -582,39 +582,43 @@ export function createRoundedBoxPicker(
       const sx = (p.x - cubeSatAnchor.x) / (s * 0.44);
       const syScreen = -(p.y - cubeSatAnchor.y) / (s * 0.44); // Canvas Y up
 
-      // Test point against 3 visible facets:
-      // Top face (Y = +1, X in [-1,1], Z in [-1,1]):
-      const denomTop = cy * cy + sy * sy; // = 1
-      const zPrimeTop = (cp - syScreen) / (sp || 0.001);
-      const xTop = (sx * cy - zPrimeTop * sy) / denomTop;
-      const zTop = (sx * sy + zPrimeTop * cy) / denomTop;
+      // Screen positions for the 3 face centers:
+      // Top face: syScreen > 0.05
+      // Left face: sx <= 0.0
+      // Right face: sx > 0.0
 
-      // Left face (X = -1, Y in [-1,1], Z in [-1,1]):
+      // Invert 3D system:
+      // Top face (Y = 1):
+      const zPrimeTop = (cp - syScreen) / (sp || 0.001);
+      const xTop = sx * cy - zPrimeTop * sy;
+      const zTop = sx * sy + zPrimeTop * cy;
+
+      // Left face (X = -1):
       const zLeft = (sx + cy) / (sy || -0.001);
       const yLeft = (syScreen + (sy + zLeft * cy) * sp) / (cp || 0.001);
 
-      // Right face (Z = 1, X in [-1,1], Y in [-1,1]):
-      //   sx = X*cy + 1*sy => X = (sx - sy)/cy
-      //   syScreen = Y*cp - (-X*sy + cy)*sp => Y = (syScreen + (-X*sy + cy)*sp)/cp
-      const xRight = (sx - sy) / (cy || 0.001);
-      const yRight = (syScreen + (-xRight * sy + cy) * sp) / (cp || 0.001);
+      // Right face (front/right side: Y in [-1,1], X in [-1,1], Z = -X*sy/cy + ...):
+      // On screen, right face is spanned by (T_front, T_right, B_right, B_front)
+      // Normal projection:
+      const xRight = (sx - sy * 0.5) / (cy || 0.8);
+      const yRight = (syScreen + sp * 0.5) / (cp || 0.9);
 
       let u = 0.5, v = 0.5, w = 0.5;
 
-      if (syScreen > 0.0 && xTop >= -1.05 && xTop <= 1.05 && zTop >= -1.05 && zTop <= 1.05) {
+      if (syScreen > 0.12 && xTop >= -1.2 && xTop <= 1.2 && zTop >= -1.2 && zTop <= 1.2) {
         // Top Face (cold <-> warm on X, saturation/depth on Z, full brightness)
         u = Math.max(0, Math.min(1, (xTop + 1) / 2));
         v = Math.max(0, Math.min(1, (zTop + 1) / 2));
         w = 1.0;
       } else if (sx <= 0.0) {
-        // Left Face (pure black shadow face toward bottom, base color toward top)
+        // Left Face (dark shadow face)
         u = 0.0;
         v = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, zLeft)) + 1) / 2));
         w = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yLeft)) + 1) / 2));
       } else {
         // Right Face (bright highlight face)
         u = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, xRight)) + 1) / 2));
-        v = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yRight)) + 1) / 2));
+        v = Math.max(0, Math.min(1, 0.5 + (sx - syScreen) * 0.3));
         w = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yRight)) + 1) / 2));
       }
 

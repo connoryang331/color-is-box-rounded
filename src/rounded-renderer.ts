@@ -773,38 +773,34 @@ export function renderRoundedBox(
     const curRgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
-    // Convert (u, v, w) in [0, 1] to 3D cube model coordinate [-1, 1] on the visible faces:
-    // Top face: Y = 1, X = (u-0.5)*2, Z = (v-0.5)*2
-    // Left face: X = -1, Z = (v-0.5)*2, Y = (w-0.5)*2
-    // Right face: Z = -1, X = (u-0.5)*2, Y = (w-0.5)*2
-    let modelX = (u - 0.5) * 2;
-    let modelY = (w - 0.5) * 2;
-    let modelZ = (v - 0.5) * 2;
+    // Direct interpolation on the active face:
+    let pickX = ax;
+    let pickY = ay;
 
-    if (w >= 0.98) {
-      // Top face
-      modelY = 1.0;
-      modelX = (u - 0.5) * 2;
-      modelZ = (v - 0.5) * 2;
-    } else if (u <= 0.02) {
-      // Left face
-      modelX = -1.0;
-      modelZ = (v - 0.5) * 2;
-      modelY = (w - 0.5) * 2;
-    } else if (modelZ <= -0.95 || (u > 0.02 && w < 0.98)) {
-      // Right face
-      modelZ = 1.0; // front-right face
-      modelX = (u - 0.5) * 2;
-      modelY = (w - 0.5) * 2;
+    if (w >= 0.99) {
+      // Top face: quad (T_back, T_right, T_front, T_left)
+      // u maps left->right (T_left -> T_right), v maps back->front (T_back -> T_front)
+      const topBackX = T_left.x + (T_right.x - T_left.x) * u;
+      const topBackY = T_left.y + (T_right.y - T_left.y) * u;
+      const topFrontX = T_back.x + (T_front.x - T_back.x) * v;
+      const topFrontY = T_back.y + (T_front.y - T_back.y) * v;
+      // Bilinear interpolation on quad:
+      pickX = (1 - v) * (T_left.x + (T_back.x - T_left.x) * (1 - u)) + v * (T_front.x + (T_right.x - T_front.x) * u);
+      pickY = (1 - v) * (T_left.y + (T_back.y - T_left.y) * (1 - u)) + v * (T_front.y + (T_right.y - T_front.y) * u);
+      const pos3D = proj3D((u - 0.5) * 2, 1.0, (v - 0.5) * 2);
+      pickX = pos3D.x;
+      pickY = pos3D.y;
+    } else if (u <= 0.01) {
+      // Left face (X = -1): Z in [-1, 1] (v), Y in [-1, 1] (w)
+      const pos3D = proj3D(-1.0, (w - 0.5) * 2, (v - 0.5) * 2);
+      pickX = pos3D.x;
+      pickY = pos3D.y;
+    } else {
+      // Right face: front face X in [-1, 1] (u), Y in [-1, 1] (w), Z = 1
+      const pos3D = proj3D((u - 0.5) * 2, (w - 0.5) * 2, (v - 0.5) * 2);
+      pickX = pos3D.x;
+      pickY = pos3D.y;
     }
-
-    const pos3D = proj3D(
-      Math.max(-1, Math.min(1, modelX)),
-      Math.max(-1, Math.min(1, modelY)),
-      Math.max(-1, Math.min(1, modelZ))
-    );
-    const pickX = pos3D.x;
-    const pickY = pos3D.y;
 
     overlayCtx.beginPath();
     overlayCtx.arc(pickX, pickY, 5.5, 0, Math.PI * 2);
