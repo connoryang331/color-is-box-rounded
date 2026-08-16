@@ -19,6 +19,10 @@ export interface BoxConfig {
 
 const DEG = Math.PI / 180;
 
+/** Ease-in-out quadratic (used by animations) */
+export const easeInOutQuad = (t: number): number =>
+  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
 export function mat3Identity(): Mat3 {
   return [1, 0, 0, 0, 1, 0, 0, 0, 1];
 }

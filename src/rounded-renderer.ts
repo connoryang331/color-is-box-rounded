@@ -1,6 +1,6 @@
 import type { Vec2, Vec3, ColorMode, RGBColor, GuideVisibility, EdgeStyleConfig } from './types';
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
-import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D, transform3D, projectSaturationTriangle, SaturationTriangle } from './camera-math';
+import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D, transform3D, projectSaturationTriangle, SaturationTriangle, easeInOutQuad } from './camera-math';
 import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
 import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb, ringColorAt } from './color-math';
@@ -13,9 +13,6 @@ export const RING_INNER_GAP = 4;
 export const RING_MID_GAP = 8;
 /** Band width of BOTH rings, in canvas px. */
 export const RING_W = 16;
-
-const easeInOutQuad = (t: number): number =>
-  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
 /** Visible state of the 3D Cube SAT popup (passed to the renderer each frame). */
 export interface CubeSatState {

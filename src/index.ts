@@ -4,7 +4,7 @@ import type {
   SatMode, CubeSatMapping,
 } from './types';
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
-import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle } from './camera-math';
+import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle, easeInOutQuad } from './camera-math';
 import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, ringColorAt, hsbToRgb, oklchToRgb } from './color-math';
 import { initWebGL, renderRoundedBox, RING_CENTER_R, RING_INNER_GAP, RING_MID_GAP, RING_W } from './rounded-renderer';
 
@@ -32,10 +32,6 @@ const wrapRad = (r: number): number => {
   else if (m < -Math.PI) m += TWO_PI;
   return m;
 };
-
-/** Ease-in-out quadratic (used by the reveal animations). */
-const easeInOutQuad = (t: number): number =>
-  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
 /** 8-digit #RRGGBBAA hex for a color with transparency. */
 const alphaHex = (rgb: RGBColor, a: number): string => {
