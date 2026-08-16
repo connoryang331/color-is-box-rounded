@@ -721,52 +721,34 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── 2. Left Face: Base color -> Black (Horizontal) + Bottom Shadow/Gray (Vertical) ──
-    const gradLeft = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_left.x, T_left.y);
-    gradLeft.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-    gradLeft.addColorStop(1, '#000000');
+    // ── 2 & 3. Unified Seamless SAT Faces (Continuous Black <-> Base Color <-> White, No center crease) ──
+    // Continuous horizontal gradient across the full width from left edge (T_left) through center (T_front) to right edge (T_right)
+    const gradSat = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
+    gradSat.addColorStop(0, '#000000');                                         // Leftmost: Pure Black
+    gradSat.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`); // Center: Pure Vibrant Base Color
+    gradSat.addColorStop(1, '#ffffff');                                         // Rightmost: Pure White
 
+    // Fill the entire two-face polygon as ONE unified seamless shape
     overlayCtx.beginPath();
     overlayCtx.moveTo(T_left.x, T_left.y);
     overlayCtx.lineTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(B_front.x, B_front.y);
-    overlayCtx.lineTo(B_left.x, B_left.y);
-    overlayCtx.closePath();
-    overlayCtx.fillStyle = gradLeft;
-    overlayCtx.fill();
-
-    // Left face vertical bottom shade: strictly from front vertex (T_front) downwards to bottom vertex (B_front)
-    const leftVertShade = overlayCtx.createLinearGradient(
-      T_front.x, T_front.y,
-      B_front.x, B_front.y
-    );
-    leftVertShade.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    leftVertShade.addColorStop(1, 'rgba(40, 40, 40, 0.75)');
-    overlayCtx.fillStyle = leftVertShade;
-    overlayCtx.fill();
-
-    // ── 3. Right Face: Base color -> White (Horizontal) + Bottom Gray (Vertical) ──
-    const gradRight = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_right.x, T_right.y);
-    gradRight.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-    gradRight.addColorStop(1, '#ffffff');
-
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
     overlayCtx.lineTo(B_right.x, B_right.y);
     overlayCtx.lineTo(B_front.x, B_front.y);
+    overlayCtx.lineTo(B_left.x, B_left.y);
     overlayCtx.closePath();
-    overlayCtx.fillStyle = gradRight;
+    overlayCtx.fillStyle = gradSat;
     overlayCtx.fill();
 
-    // Right face vertical bottom shade: strictly from front vertex (T_front) downwards to bottom vertex (B_front)
-    const rightVertShade = overlayCtx.createLinearGradient(
+    // Unified vertical bottom shading: strictly from front-top vertex (T_front) downwards to bottom-front (B_front)
+    const vertShade = overlayCtx.createLinearGradient(
       T_front.x, T_front.y,
       B_front.x, B_front.y
     );
-    rightVertShade.addColorStop(0, 'rgba(128, 128, 128, 0)');
-    rightVertShade.addColorStop(1, 'rgba(110, 110, 110, 0.7)');
-    overlayCtx.fillStyle = rightVertShade;
+    vertShade.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vertShade.addColorStop(0.4, 'rgba(50, 50, 50, 0.15)');
+    vertShade.addColorStop(1, 'rgba(70, 70, 70, 0.65)');
+    overlayCtx.fillStyle = vertShade;
     overlayCtx.fill();
 
     // ── Cube Wireframe Accents (outer perimeter + top edges only, no center dividing line) ──
