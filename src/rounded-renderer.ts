@@ -725,9 +725,6 @@ export function renderRoundedBox(
     overlayCtx.closePath();
     overlayCtx.fillStyle = gradLeft;
     overlayCtx.fill();
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    overlayCtx.lineWidth = 1;
-    overlayCtx.stroke();
 
     // ── 3. Right Face: base color (front edge) → WHITE (right edge) — the "bright/highlight" half of SAT ──
     // Gradient goes horizontally: from T_front (= base color) → T_right (= white)
@@ -743,9 +740,6 @@ export function renderRoundedBox(
     overlayCtx.closePath();
     overlayCtx.fillStyle = gradRight;
     overlayCtx.fill();
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    overlayCtx.lineWidth = 1;
-    overlayCtx.stroke();
 
     // ── Cube Wireframe Accents (outer perimeter + top edges only, no center dividing line) ──
     overlayCtx.beginPath();
