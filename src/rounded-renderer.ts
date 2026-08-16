@@ -979,14 +979,14 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // Side Quads: (topPts[next] -> topPts[i] -> botPts[i] -> botPts[next])
+      // Side Quads: (topPts[i] -> topPts[next] -> botPts[next] -> botPts[i]) facing outwards
       for (let i = 0; i < nSteps; i++) {
         const next = (i + 1) % nSteps;
         const quad: [number, number, number][] = [
-          topPtsLocal[next],
           topPtsLocal[i],
-          botPtsLocal[i],
-          botPtsLocal[next]
+          topPtsLocal[next],
+          botPtsLocal[next],
+          botPtsLocal[i]
         ];
         const thetaMid = ((i + 0.5) / nSteps) * Math.PI * 2;
         // Map angle around circle to pure black (left: theta ~ PI) -> base (theta ~ PI/2) -> white (theta ~ 0)
