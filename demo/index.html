@@ -523,6 +523,13 @@
             <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-2" value="hsv"> 2. 3D HSV (H / S / V)</label>
             <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-3" value="oklch"> 3. 3D OKLCH (L / C / H)</label>
           </div>
+          <div class="row" style="padding: 4px 0 2px 0; margin-top: 4px;">
+            <span class="label" style="font-size: 11px;">CUBE SAT SIZE</span>
+            <div class="blender-slider" id="slider-sat-size" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #a855f7;"></div>
+              <input type="text" id="v-sat-size" value="165px" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
         </div>
       </div>
 
@@ -980,6 +987,7 @@
     };
 
     const sZoom = makeGenericSlider('slider-zoom', 'v-zoom', () => picker.getZoom ? picker.getZoom() : 1.0, (v) => { if (picker.setZoom) picker.setZoom(v); }, 0.2, 2.5, 'x', 2);
+    const sSatSize = makeGenericSlider('slider-sat-size', 'v-sat-size', () => picker.getCubeSatSize ? picker.getCubeSatSize() : 165, (v) => { if (picker.setCubeSatSize) picker.setCubeSatSize(v); }, 60, 320, 'px', 0);
 
     const sSizeX = makeGenericSlider('slider-size-x', 'v-size-x', () => picker.getDimensions().sizeX, (v) => {
       const d = picker.getDimensions();

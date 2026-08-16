@@ -89,6 +89,8 @@ export interface GuideVisibility {
   satMode: SatMode;
   /** Coordinate mapping rule for 3D Cube SAT */
   cubeSatMapping: CubeSatMapping;
+  /** Size in pixels for 3D Cube SAT popup (default 165, adjustable via wheel scroll or API) */
+  cubeSatSize: number;
 }
 
 export const DEFAULT_GUIDES: GuideVisibility = {
@@ -102,6 +104,7 @@ export const DEFAULT_GUIDES: GuideVisibility = {
   svTriangle: true,
   satMode: 'cube_sat',
   cubeSatMapping: 'temp_sat_bri',
+  cubeSatSize: 165,
 };
 
 export const AXIS_LABELS: Record<ColorMode, [string, string, string]> = {
@@ -127,6 +130,8 @@ export interface RoundedBoxColorPicker {
   getSatMode(): SatMode;
   setCubeSatMapping(mapping: CubeSatMapping): void;
   getCubeSatMapping(): CubeSatMapping;
+  setCubeSatSize(size: number): void;
+  getCubeSatSize(): number;
   setRotation(yawDeg: number, pitchDeg: number): void;
   getAxisRotation(): { rotXDeg: number; rotYDeg: number; rotZDeg: number };
   /**

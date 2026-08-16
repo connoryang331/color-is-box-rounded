@@ -199,7 +199,7 @@ export function createRoundedBoxPicker(
   const rc = initWebGL(container, size);
 
   let cubeSatPointerPos: Vec2 | null = null;
-  let cubeSatSize = 140;
+  let cubeSatSize = guides.cubeSatSize || 165;
 
   let animId: number | null = null;
   const scheduleRender = () => {
@@ -929,6 +929,12 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getCubeSatMapping: () => guides.cubeSatMapping || 'temp_sat_bri',
+    setCubeSatSize: (sz: number) => {
+      cubeSatSize = Math.max(60, Math.min(320, sz));
+      guides.cubeSatSize = cubeSatSize;
+      scheduleRender();
+    },
+    getCubeSatSize: () => cubeSatSize,
     setRotation: (yawDeg: number, pitchDeg: number) => {
       // Legacy API compatibility: reset object orientation and viewport (Y axis 0 deg)
       objMat = mat3FromEuler(pitchDeg * DEG, 0, yawDeg * DEG);
