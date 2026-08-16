@@ -660,20 +660,20 @@ export function createRoundedBoxPicker(
         v = Math.max(0, Math.min(1, 1.0 - 0.4 * vertDown));     // down reduces saturation
         w = Math.max(0, Math.min(1, (1 - darkness) * (1 - 0.4 * vertDown))); // down reduces brightness
       } else {
-        // --- TOP FACE: Temperature along depth (T_front -> T_back) ---
-        const gzDepth = T_back.x - T_front.x, gyDepth = T_back.y - T_front.y;
-        const len2Depth = gzDepth * gzDepth + gyDepth * gyDepth || 1;
-        const depthFraction = Math.max(0, Math.min(1,
-          ((p.x - T_front.x) * gzDepth + (p.y - T_front.y) * gyDepth) / len2Depth));
+        // --- TOP FACE: Strictly from front corner (T_front) UPWARDS to top apex (T_back) ---
+        const gzUp = T_back.x - T_front.x, gyUp = T_back.y - T_front.y;
+        const len2Up = gzUp * gzUp + gyUp * gyUp || 1;
+        const upFraction = Math.max(0, Math.min(1,
+          ((p.x - T_front.x) * gzUp + (p.y - T_front.y) * gyUp) / len2Up));
 
-        // Lateral (T_left -> T_right) for saturation:
-        const gxTop = T_right.x - T_left.x, gyTop = T_right.y - T_left.y;
-        const len2Top = gxTop * gxTop + gyTop * gyTop || 1;
+        // Lateral axis for fine tuning:
+        const gxLat = T_right.x - T_left.x, gyLat = T_right.y - T_left.y;
+        const len2Lat = gxLat * gxLat + gyLat * gyLat || 1;
         const latFraction = Math.max(0, Math.min(1,
-          ((p.x - T_left.x) * gxTop + (p.y - T_left.y) * gyTop) / len2Top));
+          ((p.x - T_left.x) * gxLat + (p.y - T_left.y) * gyLat) / len2Lat));
 
-        u = depthFraction;                          // 0 = front, 0.5 = center, 1 = back
-        v = Math.max(0.2, Math.min(1, 0.5 + (latFraction - 0.5) * 0.8));
+        u = 0.5 + 0.5 * upFraction;                 // 0.5 = T_front (base color), 1.0 = T_back (shifted color)
+        v = Math.max(0.2, Math.min(1, 0.7 + 0.3 * latFraction));
         w = 1.0;                                     // top face full brightness
       }
 
