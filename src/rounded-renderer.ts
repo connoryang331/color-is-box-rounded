@@ -722,7 +722,7 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── 2. Left Face: HORIZONTAL — front edge=base color → left edge=black (entire left column black) ──
+    // ── 2. Left Face: Base color -> Black (Horizontal) + Bottom Shadow/Gray (Vertical) ──
     const gradLeft = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_left.x, T_left.y);
     gradLeft.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradLeft.addColorStop(1, '#000000');
@@ -736,7 +736,17 @@ export function renderRoundedBox(
     overlayCtx.fillStyle = gradLeft;
     overlayCtx.fill();
 
-    // ── 3. Right Face: HORIZONTAL — front edge=base color → right edge=white (entire right column white) ──
+    // Left face vertical bottom shade (top pure/vibrant -> bottom desaturated dark gray)
+    const leftVertShade = overlayCtx.createLinearGradient(
+      (T_left.x + T_front.x) / 2, (T_left.y + T_front.y) / 2,
+      (B_left.x + B_front.x) / 2, (B_left.y + B_front.y) / 2
+    );
+    leftVertShade.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    leftVertShade.addColorStop(1, 'rgba(40, 40, 40, 0.7)');
+    overlayCtx.fillStyle = leftVertShade;
+    overlayCtx.fill();
+
+    // ── 3. Right Face: Base color -> White (Horizontal) + Bottom Gray (Vertical) ──
     const gradRight = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_right.x, T_right.y);
     gradRight.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradRight.addColorStop(1, '#ffffff');
@@ -748,6 +758,16 @@ export function renderRoundedBox(
     overlayCtx.lineTo(B_front.x, B_front.y);
     overlayCtx.closePath();
     overlayCtx.fillStyle = gradRight;
+    overlayCtx.fill();
+
+    // Right face vertical bottom shade (top vibrant/pure -> bottom neutral gray)
+    const rightVertShade = overlayCtx.createLinearGradient(
+      (T_front.x + T_right.x) / 2, (T_front.y + T_right.y) / 2,
+      (B_front.x + B_right.x) / 2, (B_front.y + B_right.y) / 2
+    );
+    rightVertShade.addColorStop(0, 'rgba(128, 128, 128, 0)');
+    rightVertShade.addColorStop(1, 'rgba(110, 110, 110, 0.65)');
+    overlayCtx.fillStyle = rightVertShade;
     overlayCtx.fill();
 
     // ── Cube Wireframe Accents (outer perimeter + top edges only, no center dividing line) ──

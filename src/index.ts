@@ -632,25 +632,33 @@ export function createRoundedBoxPicker(
       const isTop   = topT1.inside   || topT2.inside;
 
       if (isRight || (p.x > T_front.x && !isTop && p.y >= T_right.y)) {
-        // --- RIGHT FACE: HORIZONTAL — front edge=base color, right edge=white ---
+        // --- RIGHT FACE: Horizontal Saturation + Vertical Shading ---
         const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
         const whiteness = Math.max(0, Math.min(1,
           ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
-        // whiteness: 0 at front edge (base color), 1 at right edge (white)
-        u = 0.5;            // no hue shift
-        v = 1 - whiteness;  // sat: 100% → 0% (pure white)
-        w = 1.0;            // bri: 100%
+
+        const yTopAvg = (T_front.y + T_right.y) / 2;
+        const yBotAvg = (B_front.y + B_right.y) / 2;
+        const vertDown = Math.max(0, Math.min(1, (p.y - yTopAvg) / (yBotAvg - yTopAvg || 1)));
+
+        u = 0.5;                                                // no hue shift
+        v = Math.max(0, Math.min(1, (1 - whiteness) * (1 - 0.5 * vertDown))); // down reduces saturation towards gray
+        w = Math.max(0.2, Math.min(1, 1.0 - 0.4 * vertDown));   // down slightly dims brightness
       } else if (isLeft || (p.x <= T_front.x && !isTop && p.y >= T_left.y)) {
-        // --- LEFT FACE: HORIZONTAL — front edge=base color, left edge=black ---
+        // --- LEFT FACE: Horizontal Darkness + Vertical Shading ---
         const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
         const darkness = Math.max(0, Math.min(1,
           ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
-        // darkness: 0 at front edge (base color), 1 at left edge (black)
-        u = 0.5;            // no hue shift
-        v = 1.0;            // full sat
-        w = 1 - darkness;   // bri: 100% → 0% (pure black)
+
+        const yTopAvg = (T_left.y + T_front.y) / 2;
+        const yBotAvg = (B_left.y + B_front.y) / 2;
+        const vertDown = Math.max(0, Math.min(1, (p.y - yTopAvg) / (yBotAvg - yTopAvg || 1)));
+
+        u = 0.5;                                                // no hue shift
+        v = Math.max(0, Math.min(1, 1.0 - 0.4 * vertDown));     // down reduces saturation
+        w = Math.max(0, Math.min(1, (1 - darkness) * (1 - 0.4 * vertDown))); // down reduces brightness
       } else {
         // --- TOP FACE: Temperature along depth (T_front -> T_back) ---
         const gzDepth = T_back.x - T_front.x, gyDepth = T_back.y - T_front.y;
