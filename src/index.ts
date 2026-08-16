@@ -637,18 +637,16 @@ export function createRoundedBoxPicker(
         v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
         w = 1.0;
       } else if (p.x <= T_front.x) {
-        // --- LEFT FACE: VERTICAL — top row=base color, bottom row=black (Brightness axis) ---
-        // Project p onto the top-avg → bottom-avg direction (same as canvas gradient)
-        const ltx = (T_left.x + T_front.x) / 2, lty = (T_left.y + T_front.y) / 2;
-        const lbx = (B_left.x + B_front.x) / 2, lby = (B_left.y + B_front.y) / 2;
-        const gx = lbx - ltx, gy = lby - lty;
+        // --- LEFT FACE: HORIZONTAL — front edge=base color, left edge=black ---
+        // Project p onto T_front→T_left axis (same as canvas gradient direction)
+        const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
         const darkness = Math.max(0, Math.min(1,
-          ((p.x - ltx) * gx + (p.y - lty) * gy) / gLen2));
-        // darkness: 0 at top (base color), 1 at bottom (black)
-        u = 0.5;           // no hue shift
-        v = 1.0;           // full saturation
-        w = 1 - darkness;  // brightness: 100% at top → 0% at bottom
+          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+        // darkness: 0 at front edge (base color), 1 at left edge (black)
+        u = 0.5;       // no hue shift
+        v = 1.0;       // full saturation
+        w = 1 - darkness; // brightness: 100% → 0%
       } else {
         // --- RIGHT FACE: HORIZONTAL — front edge=base color, right edge=white ---
         // Project p onto T_front→T_right axis (same as canvas gradient direction)

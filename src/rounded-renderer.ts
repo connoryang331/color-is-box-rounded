@@ -711,11 +711,8 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── 2. Left Face: VERTICAL — entire top row=base color, entire bottom row=black (Brightness axis) ──
-    // Use the midpoint of top and bottom edges so the gradient spans uniformly top→bottom
-    const lTopX = (T_left.x + T_front.x) / 2, lTopY = (T_left.y + T_front.y) / 2;
-    const lBotX = (B_left.x + B_front.x) / 2, lBotY = (B_left.y + B_front.y) / 2;
-    const gradLeft = overlayCtx.createLinearGradient(lTopX, lTopY, lBotX, lBotY);
+    // ── 2. Left Face: HORIZONTAL — front edge=base color → left edge=black (entire left column black) ──
+    const gradLeft = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_left.x, T_left.y);
     gradLeft.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradLeft.addColorStop(1, '#000000');
 
