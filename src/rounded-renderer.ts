@@ -26,6 +26,7 @@ export interface CubeSatState {
   currentColor?: RGBColor | null; // Live adjusted color from the Cube SAT
   alphaRingRadius?: number; // Multiplier relative to s (default 0.92)
   alphaRingWidth?: number;  // Stroke thickness in px (default 16)
+  shape?: 'cube' | 'cuboid' | 'pyramid'; // 3D geometry shape (default 'cube')
   pitchDeg?: number;        // Isometric Pitch in deg (default 19)
   yawDeg?: number;          // Isometric Yaw in deg (default -33)
   temperatureRange?: number;// Top face temp shift range (default 35)
@@ -687,12 +688,20 @@ export function renderRoundedBox(
     const radPitch = pitchVal * Math.PI / 180;
     const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
     const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
+    const shape = cubeSat.shape || 'cube';
+    const isPyramid = shape === 'pyramid';
+    const isCuboid = shape === 'cuboid';
 
-    // 3D projection function from unit cube [-1, 1]^3 to screen (ax, ay)
+    const scaleX = isCuboid ? 1.35 : 1.0;
+    const scaleY = isCuboid ? 0.72 : 1.0;
+    const scaleZ = isCuboid ? 1.0 : 1.0;
+
+    // 3D projection function from unit bounding box to screen (ax, ay)
     const proj3D = (px: number, py: number, pz: number): Vec2 => {
-      const x1 = px * cy + pz * sy;
-      const y1 = py;
-      const z1 = -px * sy + pz * cy;
+      const x0 = px * scaleX, y0 = py * scaleY, z0 = pz * scaleZ;
+      const x1 = x0 * cy + z0 * sy;
+      const y1 = y0;
+      const z1 = -x0 * sy + z0 * cy;
       const x2 = x1;
       const y2 = y1 * cp - z1 * sp;
       return {
@@ -702,6 +711,7 @@ export function renderRoundedBox(
     };
 
     // 8 True 3D Vertices for a Regular Cube (X in [-1, 1], Y in [-1, 1], Z in [-1, 1]):
+    const Apex   = proj3D( 0,  1.35,  0); // Pyramid Top Apex
     const T_back  = proj3D(-1,  1, -1);
     const T_left  = proj3D(-1,  1,  1);
     const T_right = proj3D( 1,  1, -1);
@@ -712,77 +722,138 @@ export function renderRoundedBox(
     const B_right = proj3D( 1, -1, -1);
     const B_front = proj3D( 1, -1,  1);
 
-    // ── 1. Top Face: Temperature Gradient — strictly from front corner (T_front) upwards to top apex (T_back) ──
     const tempRange = cubeSat.temperatureRange !== undefined ? cubeSat.temperatureRange : 35;
     const baseCol = valuesToRgb(cubeSat.colorAnchor, mode);
     const baseHsb = rgbToHsb(baseCol);
     const warmCol = hsbToRgb({ h: (baseHsb.h + tempRange) % 360, s: baseHsb.s, b: baseHsb.b });
 
-    // Direction: From bottom vertex of top face (T_front) straight UPWARDS to top vertex (T_back)
-    const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
-    gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-    gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+    if (isPyramid) {
+      // ── PYRAMID RENDERING (Apex + Left Face + Right Face + Shadow Base) ──
+      // 1. Left Face: Pure Black to Base Color (Apex -> B_left -> B_front)
+      const gradPyrL = overlayCtx.createLinearGradient(B_left.x, B_left.y, B_front.x, B_front.y);
+      gradPyrL.addColorStop(0, '#000000');
+      gradPyrL.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
 
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(T_back.x, T_back.y);
-    overlayCtx.lineTo(T_right.x, T_right.y);
-    overlayCtx.lineTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(T_left.x, T_left.y);
-    overlayCtx.closePath();
-    overlayCtx.fillStyle = gradTop;
-    overlayCtx.fill();
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    overlayCtx.lineWidth = 1;
-    overlayCtx.stroke();
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.lineTo(B_left.x, B_left.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradPyrL;
+      overlayCtx.fill();
 
-    // ── 2 & 3. Unified Seamless SAT Faces (Continuous Black <-> Base Color <-> White, No center crease) ──
-    // Continuous horizontal gradient across the full width from left edge (T_left) through center (T_front) to right edge (T_right)
-    const gradSat = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
-    gradSat.addColorStop(0, '#000000');                                         // Leftmost: Pure Black
-    gradSat.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`); // Center: Pure Vibrant Base Color
-    gradSat.addColorStop(1, '#ffffff');                                         // Rightmost: Pure White
+      // 2. Right Face: Base Color to Pure White (Apex -> B_front -> B_right)
+      const gradPyrR = overlayCtx.createLinearGradient(B_front.x, B_front.y, B_right.x, B_right.y);
+      gradPyrR.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      gradPyrR.addColorStop(1, '#ffffff');
 
-    // Fill the entire two-face polygon as ONE unified seamless shape
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(T_left.x, T_left.y);
-    overlayCtx.lineTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(T_right.x, T_right.y);
-    overlayCtx.lineTo(B_right.x, B_right.y);
-    overlayCtx.lineTo(B_front.x, B_front.y);
-    overlayCtx.lineTo(B_left.x, B_left.y);
-    overlayCtx.closePath();
-    overlayCtx.fillStyle = gradSat;
-    overlayCtx.fill();
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.lineTo(B_right.x, B_right.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradPyrR;
+      overlayCtx.fill();
 
-    // Vertical shading gradient from top (T_front) to bottom (B_front) to introduce lower shadow / neutral depth
-    const gradDepth = overlayCtx.createLinearGradient(T_front.x, T_front.y, B_front.x, B_front.y);
-    gradDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.18)');
-    gradDepth.addColorStop(1, 'rgba(30, 30, 30, 0.55)');
+      // 3. Vertical Shading from Apex (Temperature/Light) down to Bottom (Shade)
+      const gradPyrDepth = overlayCtx.createLinearGradient(Apex.x, Apex.y, B_front.x, B_front.y);
+      gradPyrDepth.addColorStop(0, `rgba(${warmCol.r}, ${warmCol.g}, ${warmCol.b}, 0.6)`);
+      gradPyrDepth.addColorStop(0.3, 'rgba(0, 0, 0, 0)');
+      gradPyrDepth.addColorStop(1, 'rgba(20, 20, 20, 0.6)');
 
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(T_left.x, T_left.y);
-    overlayCtx.lineTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(T_right.x, T_right.y);
-    overlayCtx.lineTo(B_right.x, B_right.y);
-    overlayCtx.lineTo(B_front.x, B_front.y);
-    overlayCtx.lineTo(B_left.x, B_left.y);
-    overlayCtx.closePath();
-    overlayCtx.fillStyle = gradDepth;
-    overlayCtx.fill();
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.lineTo(B_right.x, B_right.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.lineTo(B_left.x, B_left.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradPyrDepth;
+      overlayCtx.fill();
 
-    // Outline for seamless faces
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(T_left.x, T_left.y);
-    overlayCtx.lineTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(T_right.x, T_right.y);
-    overlayCtx.lineTo(B_right.x, B_right.y);
-    overlayCtx.lineTo(B_front.x, B_front.y);
-    overlayCtx.lineTo(B_left.x, B_left.y);
-    overlayCtx.lineTo(T_left.x, T_left.y);
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-    overlayCtx.lineWidth = 1.2;
-    overlayCtx.stroke();
+      // Wireframe Outlines
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.lineTo(B_left.x, B_left.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.lineTo(B_right.x, B_right.y);
+      overlayCtx.lineTo(Apex.x, Apex.y);
+      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      overlayCtx.lineWidth = 1.2;
+      overlayCtx.stroke();
+    } else {
+      // ── CUBE & CUBOID RENDERING (Top Temperature Face + Seamless SAT Left/Right Faces) ──
+      // 1. Top Face: Temperature Gradient — strictly from front corner (T_front) upwards to top apex (T_back)
+      const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
+      gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_back.x, T_back.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_left.x, T_left.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradTop;
+      overlayCtx.fill();
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      overlayCtx.lineWidth = 1;
+      overlayCtx.stroke();
+
+      // 2 & 3. Unified Seamless SAT Faces (Continuous Black <-> Base Color <-> White, No center crease)
+      const gradSat = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
+      gradSat.addColorStop(0, '#000000');                                         // Leftmost: Pure Black
+      gradSat.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`); // Center: Pure Vibrant Base Color
+      gradSat.addColorStop(1, '#ffffff');                                         // Rightmost: Pure White
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_left.x, T_left.y);
+      overlayCtx.lineTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(B_right.x, B_right.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.lineTo(B_left.x, B_left.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradSat;
+      overlayCtx.fill();
+
+      // Vertical shading gradient from top (T_front) to bottom (B_front)
+      const gradDepth = overlayCtx.createLinearGradient(T_front.x, T_front.y, B_front.x, B_front.y);
+      gradDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.18)');
+      gradDepth.addColorStop(1, 'rgba(30, 30, 30, 0.55)');
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_left.x, T_left.y);
+      overlayCtx.lineTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(B_right.x, B_right.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.lineTo(B_left.x, B_left.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradDepth;
+      overlayCtx.fill();
+
+      // Outline for seamless faces
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_left.x, T_left.y);
+      overlayCtx.lineTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(B_right.x, B_right.y);
+      overlayCtx.lineTo(B_front.x, B_front.y);
+      overlayCtx.lineTo(B_left.x, B_left.y);
+      overlayCtx.lineTo(T_left.x, T_left.y);
+      overlayCtx.closePath();
+      // Top edges of left/right faces meet at T_front — no vertical center line
+      overlayCtx.moveTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_left.x, T_left.y);
+      overlayCtx.moveTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      overlayCtx.lineWidth = 1.2;
+      overlayCtx.stroke();
+    }
 
     // ── 4. Complete 360° Alpha Ring (Full Circle with Integrated Checkerboard Texture) ──
     const start = -Math.PI / 2; // 12 o'clock
@@ -862,9 +933,10 @@ export function renderRoundedBox(
     overlayCtx.restore();
 
     // ── Current 3D Coordinate Pick Circle Dot ──
-    // 2D Outer Hull of the visible Cube on screen:
-    // Vertices in clockwise order: T_back -> T_right -> B_right -> B_front -> B_left -> T_left
-    const hull: Vec2[] = [T_back, T_right, B_right, B_front, B_left, T_left];
+    // 2D Outer Hull of the visible Shape on screen:
+    const hull: Vec2[] = isPyramid
+      ? [Apex, B_right, B_front, B_left]
+      : [T_back, T_right, B_right, B_front, B_left, T_left];
 
     // Helper: Closest point on line segment [p1, p2] to point p
     const closestOnSeg = (p: Vec2, p1: Vec2, p2: Vec2): Vec2 => {

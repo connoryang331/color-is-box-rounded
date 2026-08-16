@@ -515,9 +515,16 @@
           <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-sv-tri" value="triangle"> SV Tri</label>
         </div>
 
-        <!-- 3D Cube SAT Mapping Rules (1: Temp/Sat/Bri, 2: HSV, 3: OKLCH) Single Choice -->
+        <!-- 3D SAT Shape (Cube, Cuboid, Pyramid) Single Choice -->
         <div id="cube-mapping-box" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-dashed);">
-          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin-bottom: 4px;">Cube Mapping (Single Choice)</div>
+          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin-bottom: 4px;">SAT 3D Shape (Single Choice)</div>
+          <div class="guide-grid" style="grid-template-columns: 1fr;">
+            <label class="guide-toggle-item"><input type="radio" name="sat-shape-choice" id="rad-shape-cube" value="cube" checked> 🧊 Cube (正方体)</label>
+            <label class="guide-toggle-item"><input type="radio" name="sat-shape-choice" id="rad-shape-cuboid" value="cuboid"> 📦 Cuboid (长方体)</label>
+            <label class="guide-toggle-item"><input type="radio" name="sat-shape-choice" id="rad-shape-pyramid" value="pyramid"> 🔺 Pyramid (金字塔四棱锥)</label>
+          </div>
+
+          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 8px 0 4px 0; padding-top: 4px; border-top: 1px dashed var(--border-dashed);">Cube Mapping (Single Choice)</div>
           <div class="guide-grid" style="grid-template-columns: 1fr;">
             <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-1" value="temp_sat_bri" checked> 1. Temp / Sat / Bri (🌡️🌈🔆)</label>
             <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-2" value="hsv"> 2. 3D HSV (H / S / V)</label>
@@ -826,6 +833,16 @@
           picker.setSatMode(val);
           picker.setGuides({ svTriangle: val === 'triangle' });
           cubeMappingBox.style.display = val === 'cube_sat' ? 'block' : 'none';
+        }
+      });
+    });
+
+    // ── 3D SAT Shape (Cube, Cuboid, Pyramid) ──
+    const shapeRadios = document.querySelectorAll('input[name="sat-shape-choice"]');
+    shapeRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.checked && picker.setSatShape) {
+          picker.setSatShape(radio.value);
         }
       });
     });

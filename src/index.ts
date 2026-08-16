@@ -211,6 +211,7 @@ export function createRoundedBoxPicker(
 
   let cubeSatPointerPos: Vec2 | null = null;
   let cubeSatSize = guides.cubeSatSize || 165;
+  let satShape: SatShape = guides.satShape || 'cube';
   let alphaRingRadius = guides.alphaRingRadius !== undefined ? guides.alphaRingRadius : 0.92;
   let alphaRingWidth = guides.alphaRingWidth !== undefined ? guides.alphaRingWidth : 16;
   let cubeSatPitch = guides.cubeSatPitch !== undefined ? guides.cubeSatPitch : 19;
@@ -232,6 +233,7 @@ export function createRoundedBoxPicker(
           anchor: cubeSatAnchor,
           reveal: cubeSatReveal,
           size: cubeSatSize,
+          shape: satShape,
           colorAnchor: cubeSatColorAnchor || dotValues,
           currentCoord: cubeSatCoord,
           mapping: guides.cubeSatMapping,
@@ -669,7 +671,7 @@ export function createRoundedBoxPicker(
         }
         return;
       }
-      // 3D Perspective Projection for Cube SAT (identical parameters to renderer):
+      // 3D Perspective Projection for SAT Shape:
       const s = cubeSatSize;
       const radYaw = (cubeSatYaw !== undefined ? cubeSatYaw : -33) * Math.PI / 180;
       const radPitch = (cubeSatPitch !== undefined ? cubeSatPitch : 19) * Math.PI / 180;
@@ -681,10 +683,17 @@ export function createRoundedBoxPicker(
       const ax = Math.max(safeMargin, Math.min(rc.width - safeMargin, cubeSatAnchor.x));
       const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
 
+      const isPyramid = satShape === 'pyramid';
+      const isCuboid = satShape === 'cuboid';
+      const scaleX = isCuboid ? 1.35 : 1.0;
+      const scaleY = isCuboid ? 0.72 : 1.0;
+      const scaleZ = isCuboid ? 1.0 : 1.0;
+
       const proj = (px: number, py: number, pz: number): Vec2 => {
-        const x1 = px * cy + pz * sy;
-        const y1 = py;
-        const z1 = -px * sy + pz * cy;
+        const x0 = px * scaleX, y0 = py * scaleY, z0 = pz * scaleZ;
+        const x1 = x0 * cy + z0 * sy;
+        const y1 = y0;
+        const z1 = -x0 * sy + z0 * cy;
         const x2 = x1;
         const y2 = y1 * cp - z1 * sp;
         return {
@@ -693,6 +702,7 @@ export function createRoundedBoxPicker(
         };
       };
 
+      const Apex   = proj( 0,  1.35,  0);
       const T_back  = proj(-1,  1, -1);
       const T_left  = proj(-1,  1,  1);
       const T_right = proj( 1,  1, -1);
@@ -726,8 +736,10 @@ export function createRoundedBoxPicker(
         return;
       }
 
-      // Check whether pointer is strictly inside the 3D cube geometry
-      const hull: Vec2[] = [T_back, T_right, B_right, B_front, B_left, T_left];
+      // Check whether pointer is strictly inside the 3D geometry hull
+      const hull: Vec2[] = isPyramid
+        ? [Apex, B_right, B_front, B_left]
+        : [T_back, T_right, B_right, B_front, B_left, T_left];
       const pointInPoly = (pt: Vec2, poly: Vec2[]): boolean => {
         let inside = true;
         for (let i = 0; i < poly.length; i++) {
@@ -742,72 +754,82 @@ export function createRoundedBoxPicker(
         return inside;
       };
 
-      const isInsideCube = pointInPoly(p, hull);
-      if (!isInsideCube) {
-        // Pointer is in the blank gap between cube and alpha ring: DO NOTHING (ignore completely)
+      if (!pointInPoly(p, hull)) {
         return;
       }
 
-      // 1. Check Top Face Quad: Tri1(T_back, T_right, T_front) + Tri2(T_back, T_front, T_left)
-      const topT1 = bary(p, T_back, T_right, T_front);
-      const topT2 = bary(p, T_back, T_front, T_left);
-
-      // 2. Check Left Face Quad: Tri1(T_left, T_front, B_front) + Tri2(T_left, B_front, B_left)
-      const leftT1 = bary(p, T_left, T_front, B_front);
-      const leftT2 = bary(p, T_left, B_front, B_left);
-
-      // 3. Check Right Face Quad: Tri1(T_front, T_right, B_right) + Tri2(T_front, B_right, B_front)
-      const rightT1 = bary(p, T_front, T_right, B_right);
-      const rightT2 = bary(p, T_front, B_right, B_front);
-
       let u = 0.5, v = 0.5, w = 0.5;
 
-      const isRight = rightT1.inside || rightT2.inside;
-      const isLeft  = leftT1.inside  || leftT2.inside;
-      const isTop   = topT1.inside   || topT2.inside;
+      if (isPyramid) {
+        // Pyramid Left Face: Apex -> B_left -> B_front
+        const pyrLeft = bary(p, Apex, B_front, B_left);
+        // Pyramid Right Face: Apex -> B_front -> B_right
+        const pyrRight = bary(p, Apex, B_right, B_front);
 
-      if (isRight) {
-        // --- RIGHT FACE: Horizontal Saturation + Vertical Shading from T_front downwards ---
-        const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
-        const gLen2 = gx * gx + gy * gy || 1;
-        const whiteness = Math.max(0, Math.min(1,
-          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+        const vertDown = Math.max(0, Math.min(1, (p.y - Apex.y) / (B_front.y - Apex.y || 1)));
 
-        const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (B_front.y - T_front.y || 1)));
-
-        u = 0.5;                                                // no hue shift
-        v = Math.max(0, Math.min(1, (1 - whiteness) * (1 - 0.55 * vertDown))); // down reduces saturation towards gray
-        w = Math.max(0.2, Math.min(1, 1.0 - 0.45 * vertDown));  // down dims brightness towards bottom
-      } else if (isLeft) {
-        // --- LEFT FACE: Horizontal Darkness + Vertical Shading from T_front downwards ---
-        const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
-        const gLen2 = gx * gx + gy * gy || 1;
-        const darkness = Math.max(0, Math.min(1,
-          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
-
-        const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (B_front.y - T_front.y || 1)));
-
-        u = 0.5;                                                // no hue shift
-        v = Math.max(0, Math.min(1, 1.0 - 0.45 * vertDown));    // down reduces saturation
-        w = Math.max(0, Math.min(1, (1 - darkness) * (1 - 0.45 * vertDown))); // down reduces brightness
-      } else if (isTop) {
-        // --- TOP FACE: Strictly from front corner (T_front) UPWARDS to top apex (T_back) ---
-        const gzUp = T_back.x - T_front.x, gyUp = T_back.y - T_front.y;
-        const len2Up = gzUp * gzUp + gyUp * gyUp || 1;
-        const upFraction = Math.max(0, Math.min(1,
-          ((p.x - T_front.x) * gzUp + (p.y - T_front.y) * gyUp) / len2Up));
-
-        // Lateral axis for fine tuning:
-        const gxLat = T_right.x - T_left.x, gyLat = T_right.y - T_left.y;
-        const len2Lat = gxLat * gxLat + gyLat * gyLat || 1;
-        const latFraction = Math.max(0, Math.min(1,
-          ((p.x - T_left.x) * gxLat + (p.y - T_left.y) * gyLat) / len2Lat));
-
-        u = 0.5 + 0.5 * upFraction;                 // 0.5 = T_front (base color), 1.0 = T_back (shifted color)
-        v = Math.max(0.2, Math.min(1, 0.7 + 0.3 * latFraction));
-        w = 1.0;                                     // top face full brightness
+        if (pyrRight.inside) {
+          const whiteness = Math.max(0, Math.min(1, (p.x - B_front.x) / (B_right.x - B_front.x || 1)));
+          u = 0.5;
+          v = Math.max(0, Math.min(1, 1 - whiteness * 0.85));
+          w = Math.max(0.1, Math.min(1, (1 - vertDown * 0.55) * (0.6 + 0.4 * whiteness)));
+        } else {
+          const blackness = Math.max(0, Math.min(1, (B_front.x - p.x) / (B_front.x - B_left.x || 1)));
+          u = 0.5;
+          v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
+          w = Math.max(0, Math.min(1, (1 - blackness) * (1 - vertDown * 0.55)));
+        }
       } else {
-        return;
+        // 1. Check Top Face Quad: Tri1(T_back, T_right, T_front) + Tri2(T_back, T_front, T_left)
+        const topT1 = bary(p, T_back, T_right, T_front);
+        const topT2 = bary(p, T_back, T_front, T_left);
+
+        // 2. Check Left Face Quad: Tri1(T_left, T_front, B_front) + Tri2(T_left, B_front, B_left)
+        const leftT1 = bary(p, T_left, T_front, B_front);
+        const leftT2 = bary(p, T_left, B_front, B_left);
+
+        // 3. Check Right Face Quad: Tri1(T_front, T_right, B_right) + Tri2(T_front, B_right, B_front)
+        const rightT1 = bary(p, T_front, T_right, B_right);
+        const rightT2 = bary(p, T_front, B_right, B_front);
+
+        const isRight = rightT1.inside || rightT2.inside;
+        const isLeft  = leftT1.inside  || leftT2.inside;
+        const isTop   = topT1.inside   || topT2.inside;
+
+        if (isRight) {
+          const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
+          const gLen2 = gx * gx + gy * gy || 1;
+          const whiteness = Math.max(0, Math.min(1,
+            ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+
+          const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (B_front.y - T_front.y || 1)));
+
+          u = 0.5;
+          v = Math.max(0, Math.min(1, 1 - whiteness * 0.85));
+          w = Math.max(0.1, Math.min(1, (1 - vertDown * 0.55) * (0.6 + 0.4 * whiteness)));
+        } else if (isLeft) {
+          const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
+          const gLen2 = gx * gx + gy * gy || 1;
+          const blackness = Math.max(0, Math.min(1,
+            ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+
+          const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (B_front.y - T_front.y || 1)));
+
+          u = 0.5;
+          v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
+          w = Math.max(0, Math.min(1, (1 - blackness) * (1 - vertDown * 0.55)));
+        } else if (isTop) {
+          const gx = T_back.x - T_front.x, gy = T_back.y - T_front.y;
+          const gLen2 = gx * gx + gy * gy || 1;
+          const projDist = ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2;
+          const t = Math.max(0, Math.min(1, projDist));
+
+          u = 0.5 + t * 0.5;
+          v = 1.0;
+          w = 1.0;
+        } else {
+          return;
+        }
       }
 
       cubeSatPointerPos = p;
@@ -1055,6 +1077,12 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getSatMode: () => guides.satMode || 'cube_sat',
+    setSatShape: (shape: SatShape) => {
+      satShape = shape;
+      guides.satShape = shape;
+      scheduleRender();
+    },
+    getSatShape: () => satShape || 'cube',
     setCubeSatMapping: (csm: CubeSatMapping) => {
       guides.cubeSatMapping = csm;
       scheduleRender();
