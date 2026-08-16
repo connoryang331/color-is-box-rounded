@@ -640,6 +640,22 @@ export function createRoundedBoxPicker(
         return { u, v, w, inside };
       };
 
+      // Distance from center (ax, ay) to check whether pointer is dragging the Alpha Orbital Ring
+      const distFromCenter = Math.hypot(p.x - ax, p.y - ay);
+      const rAlpha = s * 0.70;
+
+      if (distFromCenter >= s * 0.58) {
+        // Pointer is on / near the outer Alpha Orbital Ring: calculate angle and update alpha
+        // Angle starts at 12 o'clock (-PI/2) and goes clockwise 0..2PI
+        let ang = Math.atan2(p.y - ay, p.x - ax) + Math.PI / 2;
+        if (ang < 0) ang += Math.PI * 2;
+        const newAlpha = Math.max(0, Math.min(1, ang / (Math.PI * 2)));
+        setAlphaInternal(newAlpha);
+        notify();
+        cubeSatPointerPos = p;
+        return;
+      }
+
       // 1. Check Top Face Quad: Tri1(T_back, T_right, T_front) + Tri2(T_back, T_front, T_left)
       const topT1 = bary(p, T_back, T_right, T_front);
       const topT2 = bary(p, T_back, T_front, T_left);

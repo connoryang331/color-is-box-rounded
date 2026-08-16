@@ -769,6 +769,57 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1.2;
     overlayCtx.stroke();
 
+    // ── 4. Alpha Orbital Ring surrounding the 3D Cube SAT ──
+    const rAlpha = s * 0.70;
+    const wRing = 10;
+    const alphaStart = -Math.PI / 2; // 12 o'clock
+
+    // Dotted track background
+    overlayCtx.save();
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    overlayCtx.lineWidth = 2;
+    overlayCtx.setLineDash([3, 5]);
+    overlayCtx.beginPath();
+    overlayCtx.arc(ax, ay, rAlpha, 0, Math.PI * 2);
+    overlayCtx.stroke();
+    overlayCtx.setLineDash([]);
+
+    // Solid Alpha Arc up to current alpha value
+    const alphaEnd = alphaStart + alpha * Math.PI * 2;
+    if (alpha > 0.005) {
+      overlayCtx.beginPath();
+      overlayCtx.arc(ax, ay, rAlpha, alphaStart, alphaEnd);
+      overlayCtx.lineWidth = wRing;
+      overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, 0.85)`;
+      overlayCtx.stroke();
+
+      // Outer & inner boundary lines for the arc
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      overlayCtx.lineWidth = 1;
+      overlayCtx.beginPath();
+      overlayCtx.arc(ax, ay, rAlpha - wRing / 2, alphaStart, alphaEnd);
+      overlayCtx.stroke();
+      overlayCtx.beginPath();
+      overlayCtx.arc(ax, ay, rAlpha + wRing / 2, alphaStart, alphaEnd);
+      overlayCtx.stroke();
+
+      // Thumb knob marking current alpha position
+      const kx = ax + rAlpha * Math.cos(alphaEnd);
+      const ky = ay + rAlpha * Math.sin(alphaEnd);
+      overlayCtx.beginPath();
+      overlayCtx.arc(kx, ky, 7, 0, Math.PI * 2);
+      overlayCtx.fillStyle = '#ffffff';
+      overlayCtx.fill();
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.6)';
+      overlayCtx.lineWidth = 1.2;
+      overlayCtx.stroke();
+      overlayCtx.beginPath();
+      overlayCtx.arc(kx, ky, 3, 0, Math.PI * 2);
+      overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+      overlayCtx.fill();
+    }
+    overlayCtx.restore();
+
     // ── Current 3D Coordinate Pick Circle Dot ──
     const curRgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
