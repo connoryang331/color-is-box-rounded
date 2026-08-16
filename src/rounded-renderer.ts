@@ -23,6 +23,7 @@ export interface CubeSatState {
   currentCoord: Vec3;       // Current internal coord (u, v, w) in [0, 1]
   mapping: 'temp_sat_bri' | 'hsv' | 'oklch';
   pointerPos?: Vec2 | null; // Direct pointer canvas coordinates
+  currentColor?: RGBColor | null; // Live adjusted color from the Cube SAT
 }
 
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
@@ -772,6 +773,8 @@ export function renderRoundedBox(
 
     // ── 4. Complete 360° Alpha Ring (Full Circle with Integrated Checkerboard Texture) ──
     const start = -Math.PI / 2; // 12 o'clock
+    const activeRgb = cubeSat.currentColor || valuesToRgb(dotValues, mode);
+    const finalRgb = invert ? { r: 255 - activeRgb.r, g: 255 - activeRgb.g, b: 255 - activeRgb.b } : activeRgb;
 
     overlayCtx.save();
 

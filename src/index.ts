@@ -209,7 +209,7 @@ export function createRoundedBoxPicker(
       renderRoundedBox(
         rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
         ringAnchor ? { anchor: ringAnchor, reveal: ringReveal, band: ringBand, colorAnchor: ringColorAnchor, angle: ringAngle } : null,
-        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: cubeSatSize, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos } : null,
+        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: cubeSatSize, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos, currentColor: cubeSatCurrentColor } : null,
         alpha
       );
     });
