@@ -515,13 +515,13 @@
           <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-sv-tri" value="triangle"> SV Tri</label>
         </div>
 
-        <!-- 3D Cube SAT Mapping Rules (1: Temp/Sat/Bri, 2: HSV, 3: OKLCH) -->
-        <div id="cube-mapping-box" style="margin-top: 6px;">
-          <div style="font-size: 9.5px; color: var(--text-label); margin-bottom: 2px;">Cube Mapping:</div>
-          <div style="display: flex; gap: 4px;">
-            <button class="btn-mini active" id="btn-rule-1" title="Rule 1: Temp (🌡️) + Sat (🌈) + Bri (🔆)">1. Temp/Sat/Bri</button>
-            <button class="btn-mini" id="btn-rule-2" title="Rule 2: 3D HSV (H/S/V)">2. HSV</button>
-            <button class="btn-mini" id="btn-rule-3" title="Rule 3: 3D OKLCH (L/C/H)">3. OKLCH</button>
+        <!-- 3D Cube SAT Mapping Rules (1: Temp/Sat/Bri, 2: HSV, 3: OKLCH) Single Choice -->
+        <div id="cube-mapping-box" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-dashed);">
+          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin-bottom: 4px;">Cube Mapping (Single Choice)</div>
+          <div class="guide-grid" style="grid-template-columns: 1fr;">
+            <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-1" value="temp_sat_bri" checked> 1. Temp / Sat / Bri (🌡️🌈🔆)</label>
+            <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-2" value="hsv"> 2. 3D HSV (H / S / V)</label>
+            <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-3" value="oklch"> 3. 3D OKLCH (L / C / H)</label>
           </div>
         </div>
       </div>
@@ -754,21 +754,14 @@
     });
 
     // ── 3D Cube SAT Mapping Rules (1: Temp/Sat/Bri, 2: HSV, 3: OKLCH) ──
-    const btnRule1 = document.getElementById('btn-rule-1');
-    const btnRule2 = document.getElementById('btn-rule-2');
-    const btnRule3 = document.getElementById('btn-rule-3');
-
-    const updateRuleUI = (rule) => {
-      [btnRule1, btnRule2, btnRule3].forEach(b => b.classList.remove('active'));
-      if (rule === 'temp_sat_bri') btnRule1.classList.add('active');
-      else if (rule === 'hsv') btnRule2.classList.add('active');
-      else btnRule3.classList.add('active');
-      picker.setCubeSatMapping(rule);
-    };
-
-    btnRule1.addEventListener('click', () => updateRuleUI('temp_sat_bri'));
-    btnRule2.addEventListener('click', () => updateRuleUI('hsv'));
-    btnRule3.addEventListener('click', () => updateRuleUI('oklch'));
+    const ruleRadios = document.querySelectorAll('input[name="cube-mapping-rule"]');
+    ruleRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.checked) {
+          picker.setCubeSatMapping(radio.value);
+        }
+      });
+    });
 
     // ── Generic Blender Slider Component ──
     const makeGenericSlider = (sliderId, inputId, getFn, setFn, minVal, maxVal, unit = '', stepPrecision = 2) => {

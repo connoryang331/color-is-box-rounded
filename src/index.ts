@@ -565,13 +565,64 @@ export function createRoundedBoxPicker(
         }
         return;
       }
-      // Dragging inside 3D Cube SAT: calculate relative delta from anchor
+      // Dragging inside 3D Cube SAT: calculate cursor position relative to anchor & map across 3 visible facets
       const s = 140;
-      const dx = (p.x - cubeSatAnchor.x) / (s * 0.6);
-      const dy = (p.y - cubeSatAnchor.y) / (s * 0.6);
-      const u = Math.max(0, Math.min(1, 0.5 + dx));
-      const v = Math.max(0, Math.min(1, 0.5 - dy));
-      const w = Math.max(0, Math.min(1, 0.5 + dx * 0.5 - dy * 0.5));
+      const radYaw = -33 * Math.PI / 180;
+      const radPitch = 19 * Math.PI / 180;
+      const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
+      const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
+
+      // Normalized 2D vector from popup center:
+      const sx = (p.x - cubeSatAnchor.x) / (s * 0.44);
+      const syScreen = -(p.y - cubeSatAnchor.y) / (s * 0.44); // Canvas Y up
+
+      // Test point against 3 visible facets:
+      // Top face (Y = +1, X in [-1,1], Z in [-1,1]):
+      //   xScreen = X*cy + Z*sy
+      //   yScreen = 1*cp - (-X*sy + Z*cy)*sp
+      //   => dy = (1*cp - yScreen)/sp = -X*sy + Z*cy
+      // Inverting 2x2 system for Top face:
+      const denomTop = cy * cy + sy * sy; // = 1
+      const zPrimeTop = (cp - syScreen) / (sp || 0.001);
+      const xTop = (sx * cy - zPrimeTop * sy) / denomTop;
+      const zTop = (sx * sy + zPrimeTop * cy) / denomTop;
+
+      // Left face (X = -1, Y in [-1,1], Z in [-1,1]):
+      //   sx = -cy + Z*sy => Z = (sx + cy)/sy
+      //   syScreen = Y*cp - (sy + Z*cy)*sp => Y = (syScreen + (sy + Z*cy)*sp)/cp
+      const zLeft = (sx + cy) / (sy || -0.001);
+      const yLeft = (syScreen + (sy + zLeft * cy) * sp) / (cp || 0.001);
+
+      // Right face (Z = -1, X in [-1,1], Y in [-1,1]):
+      //   sx = X*cy - sy => X = (sx + sy)/cy
+      //   syScreen = Y*cp - (-X*sy - cy)*sp => Y = (syScreen + (-X*sy - cy)*sp)/cp
+      const xRight = (sx + sy) / (cy || 0.001);
+      const yRight = (syScreen + (-xRight * sy - cy) * sp) / (cp || 0.001);
+
+      let u = 0.5, v = 0.5, w = 0.5;
+
+      if (xTop >= -1.05 && xTop <= 1.05 && zTop >= -1.05 && zTop <= 1.05) {
+        // Point is on Top Face (cold <-> warm on X, saturation/depth on Z)
+        u = Math.max(0, Math.min(1, (xTop + 1) / 2));
+        v = 1.0;
+        w = Math.max(0, Math.min(1, (zTop + 1) / 2));
+      } else if (zLeft >= -1.05 && zLeft <= 1.05 && yLeft >= -1.05 && yLeft <= 1.05) {
+        // Point is on Left Face (dark shadow face)
+        u = 0.0;
+        v = Math.max(0, Math.min(1, (yLeft + 1) / 2));
+        w = Math.max(0, Math.min(1, (zLeft + 1) / 2));
+      } else if (xRight >= -1.05 && xRight <= 1.05 && yRight >= -1.05 && yRight <= 1.05) {
+        // Point is on Right Face (bright highlight face)
+        u = Math.max(0, Math.min(1, (xRight + 1) / 2));
+        v = Math.max(0, Math.min(1, (yRight + 1) / 2));
+        w = 0.0;
+      } else {
+        // Fallback: direct screen clamped mapping
+        u = Math.max(0, Math.min(1, 0.5 + sx * 0.55));
+        v = Math.max(0, Math.min(1, 0.5 + syScreen * 0.55));
+        w = Math.max(0, Math.min(1, 0.5 + (sx + syScreen) * 0.35));
+      }
+
       cubeSatCoord = { x: u, y: v, z: w };
       applyCubeSatCoord(u, v, w);
     } else if (isRingDrag && ringAnchor) {
