@@ -637,18 +637,20 @@ export function createRoundedBoxPicker(
         v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
         w = 1.0;
       } else if (p.x <= T_front.x) {
-        // --- LEFT FACE: base color (T_front) → pure black (T_left) ---
-        // Mirror Canvas createLinearGradient(T_front, T_left): project p onto that axis
-        const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
+        // --- LEFT FACE: top=base color → bottom=black  (Brightness axis, vertical) ---
+        // Mirror the vertical gradient: project p onto the (topAvg → botAvg) axis
+        const ltx = (T_left.x + T_front.x) / 2, lty = (T_left.y + T_front.y) / 2;
+        const lbx = (B_left.x + B_front.x) / 2, lby = (B_left.y + B_front.y) / 2;
+        const gx = lbx - ltx, gy = lby - lty;
         const gLen2 = gx * gx + gy * gy || 1;
         const darkness = Math.max(0, Math.min(1,
-          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
-        // darkness: 0 at front edge (base color), 1 at left edge (black)
-        u = 0.5;           // no hue shift — (u-0.5)*60 = 0°
-        v = 1 - darkness;  // sat: 100% → 0%
-        w = 1 - darkness;  // bri: 100% → 0%
+          ((p.x - ltx) * gx + (p.y - lty) * gy) / gLen2));
+        // darkness: 0 at top (base color), 1 at bottom (black)
+        u = 0.5;       // no hue shift
+        v = 1.0;       // full saturation
+        w = 1 - darkness; // brightness: 100% at top → 0% at bottom
       } else {
-        // --- RIGHT FACE: base color (T_front) → pure white (T_right) ---
+        // --- RIGHT FACE: front edge=base color → right edge=white  (Saturation axis, horizontal) ---
         // Mirror Canvas createLinearGradient(T_front, T_right): project p onto that axis
         const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;

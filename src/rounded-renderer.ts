@@ -711,9 +711,11 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── 2. Left Face: base color (front edge) → BLACK (left edge) — the "dark/shadow" half of SAT ──
-    // Gradient goes horizontally: from T_front (= base color) → T_left (= black)
-    const gradLeft = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_left.x, T_left.y);
+    // ── 2. Left Face: VERTICAL — top=base color → bottom=black  (Brightness / Value axis) ──
+    // The face spans (T_left, T_front) at top to (B_left, B_front) at bottom
+    const leftTopX = (T_left.x + T_front.x) / 2, leftTopY = (T_left.y + T_front.y) / 2;
+    const leftBotX = (B_left.x + B_front.x) / 2, leftBotY = (B_left.y + B_front.y) / 2;
+    const gradLeft = overlayCtx.createLinearGradient(leftTopX, leftTopY, leftBotX, leftBotY);
     gradLeft.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradLeft.addColorStop(1, '#000000');
 
@@ -726,8 +728,7 @@ export function renderRoundedBox(
     overlayCtx.fillStyle = gradLeft;
     overlayCtx.fill();
 
-    // ── 3. Right Face: base color (front edge) → WHITE (right edge) — the "bright/highlight" half of SAT ──
-    // Gradient goes horizontally: from T_front (= base color) → T_right (= white)
+    // ── 3. Right Face: HORIZONTAL — front edge=base color → right edge=white  (Saturation axis) ──
     const gradRight = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_right.x, T_right.y);
     gradRight.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradRight.addColorStop(1, '#ffffff');
