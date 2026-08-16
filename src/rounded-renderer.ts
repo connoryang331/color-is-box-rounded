@@ -680,8 +680,8 @@ export function renderRoundedBox(
     ax = Math.max(safeMargin, Math.min(width - safeMargin, ax));
     ay = Math.max(safeMargin, Math.min(height - safeMargin, ay));
 
-    // 3D Rotated Perspective for the Cube SAT matching 3d cube sat.png:
-    // Configurable pitch and yaw (default Yaw = -33°, Pitch = 19°)
+    // 3D Rotated Perspective for the Geometry SAT:
+    // Full 3D Transformation with Yaw & Pitch
     const pitchVal = cubeSat.pitchDeg !== undefined ? cubeSat.pitchDeg : 19;
     const yawVal = cubeSat.yawDeg !== undefined ? cubeSat.yawDeg : -33;
     const radYaw = yawVal * Math.PI / 180;
@@ -698,372 +698,415 @@ export function renderRoundedBox(
     const scaleY = isCuboid ? 0.72 : 1.0;
     const scaleZ = isCuboid ? 1.0 : 1.0;
 
-    // 3D projection function from unit bounding box to screen (ax, ay)
-    const proj3D = (px: number, py: number, pz: number): Vec2 => {
+    // 3D camera coordinate transform: (px, py, pz) -> camera space (cx, cy, cz)
+    // where +cx is screen right, +cy is screen up, +cz is towards camera (closer to viewer)
+    const toCam3D = (px: number, py: number, pz: number) => {
       const x0 = px * scaleX, y0 = py * scaleY, z0 = pz * scaleZ;
+      // 1. Yaw rotation around Y axis
       const x1 = x0 * cy + z0 * sy;
       const y1 = y0;
       const z1 = -x0 * sy + z0 * cy;
+      // 2. Pitch rotation around X axis
       const x2 = x1;
       const y2 = y1 * cp - z1 * sp;
-      return {
-        x: ax + x2 * s * 0.44,
-        y: ay - y2 * s * 0.44, // Invert Y for canvas
-      };
+      const z2 = y1 * sp + z1 * cp;
+      return { x: x2, y: y2, z: z2 };
     };
 
-    // 8 True 3D Vertices for a Regular Cube (X in [-1, 1], Y in [-1, 1], Z in [-1, 1]):
-    const ApexTop    = proj3D( 0,  1.35,  0); // Pyramid Top Apex
-    const ApexBottom = proj3D( 0, -1.35,  0); // Inverted Pyramid Bottom Apex
-    const T_back  = proj3D(-1,  1, -1);
-    const T_left  = proj3D(-1,  1,  1);
-    const T_right = proj3D( 1,  1, -1);
-    const T_front = proj3D( 1,  1,  1);
-
-    const B_back  = proj3D(-1, -1, -1);
-    const B_left  = proj3D(-1, -1,  1);
-    const B_right = proj3D( 1, -1, -1);
-    const B_front = proj3D( 1, -1,  1);
+    // 3D projection function from unit bounding box to screen (ax, ay)
+    const proj3D = (px: number, py: number, pz: number): Vec2 => {
+      const c = toCam3D(px, py, pz);
+      return {
+        x: ax + c.x * s * 0.44,
+        y: ay - c.y * s * 0.44, // Invert Y for canvas screen
+      };
+    };
 
     const tempRange = cubeSat.temperatureRange !== undefined ? cubeSat.temperatureRange : 35;
     const baseCol = valuesToRgb(cubeSat.colorAnchor, mode);
     const baseHsb = rgbToHsb(baseCol);
     const warmCol = hsbToRgb({ h: (baseHsb.h + tempRange) % 360, s: baseHsb.s, b: baseHsb.b });
 
+    // ── Universal 3D Polygon Renderer with Face-Normal Backface Culling & Depth Sorting ──
+    interface Face3D {
+      pts3D: { x: number; y: number; z: number }[]; // Local coords before scale
+      type: 'top_temp' | 'bottom_dark' | 'front_sat' | 'side_x_pos' | 'side_x_neg' | 'side_z_pos' | 'side_z_neg';
+      render: (poly2D: Vec2[], depthZ: number) => void;
+    }
+
+    const facesToRender: { depth: number; draw: () => void }[] = [];
+
+    const addPolygonFace = (
+      localVerts: [number, number, number][],
+      type: string,
+      drawFn: (poly2D: Vec2[]) => void
+    ) => {
+      const camVerts = localVerts.map(v => toCam3D(v[0], v[1], v[2]));
+      const poly2D = localVerts.map(v => proj3D(v[0], v[1], v[2]));
+
+      // Compute 2D signed area (screen normal Z) to test visibility facing camera (CCW order)
+      let area2D = 0;
+      for (let i = 0; i < poly2D.length; i++) {
+        const p1 = poly2D[i];
+        const p2 = poly2D[(i + 1) % poly2D.length];
+        area2D += (p2.x - p1.x) * (p2.y + p1.y);
+      }
+
+      // If area2D > 0 in canvas screen coords (where Y is down), the face is facing the camera!
+      if (area2D > 1e-4) {
+        let avgZ = 0;
+        for (const cv of camVerts) avgZ += cv.z;
+        avgZ /= camVerts.length;
+
+        facesToRender.push({
+          depth: avgZ,
+          draw: () => drawFn(poly2D),
+        });
+      }
+    };
+
     if (isPyramid) {
-      // ── 1. PYRAMID (正金字塔四棱锥: 顶部 Apex + 底部三面展开) ──
-      const gradPyrL = overlayCtx.createLinearGradient(B_left.x, B_left.y, B_front.x, B_front.y);
-      gradPyrL.addColorStop(0, '#000000');
-      gradPyrL.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      // ── PYRAMID: Apex (0, 1.35, 0) + Base Quad [-1, 1]x[-1, 1] at Y = -1 ──
+      // 1. Front (+Z): Apex -> (1, -1, 1) -> (-1, -1, 1)
+      addPolygonFace([[0, 1.35, 0], [1, -1, 1], [-1, -1, 1]], 'pyr_front', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.lineTo(B_left.x, B_left.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradPyrL;
-      overlayCtx.fill();
+      // 2. Right (+X): Apex -> (1, -1, -1) -> (1, -1, 1)
+      addPolygonFace([[0, 1.35, 0], [1, -1, -1], [1, -1, 1]], 'pyr_right', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+        grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      const gradPyrR = overlayCtx.createLinearGradient(B_front.x, B_front.y, B_right.x, B_right.y);
-      gradPyrR.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-      gradPyrR.addColorStop(1, '#ffffff');
+      // 3. Left (-X): Apex -> (-1, -1, 1) -> (-1, -1, -1)
+      addPolygonFace([[0, 1.35, 0], [-1, -1, 1], [-1, -1, -1]], 'pyr_left', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
-      overlayCtx.lineTo(B_right.x, B_right.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradPyrR;
-      overlayCtx.fill();
+      // 4. Back (-Z): Apex -> (-1, -1, -1) -> (1, -1, -1)
+      addPolygonFace([[0, 1.35, 0], [-1, -1, -1], [1, -1, -1]], 'pyr_back', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      const gradPyrDepth = overlayCtx.createLinearGradient(ApexTop.x, ApexTop.y, B_front.x, B_front.y);
-      gradPyrDepth.addColorStop(0, `rgba(${warmCol.r}, ${warmCol.g}, ${warmCol.b}, 0.6)`);
-      gradPyrDepth.addColorStop(0.3, 'rgba(0, 0, 0, 0)');
-      gradPyrDepth.addColorStop(1, 'rgba(20, 20, 20, 0.6)');
-
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
-      overlayCtx.lineTo(B_right.x, B_right.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.lineTo(B_left.x, B_left.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradPyrDepth;
-      overlayCtx.fill();
-
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
-      overlayCtx.lineTo(B_left.x, B_left.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.lineTo(B_right.x, B_right.y);
-      overlayCtx.lineTo(ApexTop.x, ApexTop.y);
-      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.stroke();
+      // 5. Bottom Base (-Y): (-1, -1, -1) -> (1, -1, -1) -> (1, -1, 1) -> (-1, -1, 1)
+      addPolygonFace([[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1]], 'pyr_bot', (pts) => {
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        overlayCtx.lineWidth = 1;
+        overlayCtx.stroke();
+      });
     } else if (isPyramidInv) {
-      // ── 2. INVERTED PYRAMID (倒金字塔四棱锥: 顶部平顶基座 + 底部尖顶 Apex) ──
-      // Top Quad Base (Temperature Face): T_back -> T_right -> T_front -> T_left
-      const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
-      gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-      gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+      // ── INVERTED PYRAMID: Base Quad at Y = 1 + Bottom Apex (0, -1.35, 0) ──
+      // 1. Top Base Quad (+Y): (-1, 1, -1) -> (-1, 1, 1) -> (1, 1, 1) -> (1, 1, -1)
+      addPolygonFace([[-1, 1, -1], [-1, 1, 1], [1, 1, 1], [1, 1, -1]], 'inv_top', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[3].x, pts[3].y);
+        grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_back.x, T_back.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_left.x, T_left.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradTop;
-      overlayCtx.fill();
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      overlayCtx.lineWidth = 1;
-      overlayCtx.stroke();
+      // 2. Front Face (+Z): (0, -1.35, 0) -> (-1, 1, 1) -> (1, 1, 1)
+      addPolygonFace([[0, -1.35, 0], [-1, 1, 1], [1, 1, 1]], 'inv_front', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      // Left Inverted Face: (T_left -> T_front -> ApexBottom)
-      const gradInvL = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_front.x, T_front.y);
-      gradInvL.addColorStop(0, '#000000');
-      gradInvL.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      // 3. Right Face (+X): (0, -1.35, 0) -> (1, 1, 1) -> (1, 1, -1)
+      addPolygonFace([[0, -1.35, 0], [1, 1, 1], [1, 1, -1]], 'inv_right', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+        grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_left.x, T_left.y);
-      overlayCtx.lineTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradInvL;
-      overlayCtx.fill();
+      // 4. Left Face (-X): (0, -1.35, 0) -> (-1, 1, -1) -> (-1, 1, 1)
+      addPolygonFace([[0, -1.35, 0], [-1, 1, -1], [-1, 1, 1]], 'inv_left', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      // Right Inverted Face: (T_front -> T_right -> ApexBottom)
-      const gradInvR = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_right.x, T_right.y);
-      gradInvR.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-      gradInvR.addColorStop(1, '#ffffff');
-
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradInvR;
-      overlayCtx.fill();
-
-      // Vertical Shading down to bottom apex
-      const gradInvDepth = overlayCtx.createLinearGradient(T_front.x, T_front.y, ApexBottom.x, ApexBottom.y);
-      gradInvDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      gradInvDepth.addColorStop(1, 'rgba(20, 20, 20, 0.7)');
-
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_left.x, T_left.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradInvDepth;
-      overlayCtx.fill();
-
-      // Outlines
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_left.x, T_left.y);
-      overlayCtx.lineTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
-      overlayCtx.lineTo(T_left.x, T_left.y);
-      overlayCtx.moveTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.stroke();
+      // 5. Back Face (-Z): (0, -1.35, 0) -> (1, 1, -1) -> (-1, 1, -1)
+      addPolygonFace([[0, -1.35, 0], [1, 1, -1], [-1, 1, -1]], 'inv_back', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        overlayCtx.lineTo(pts[1].x, pts[1].y);
+        overlayCtx.lineTo(pts[2].x, pts[2].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
     } else if (isCylinder) {
-      // ── 3. CYLINDER (3D 圆柱体: 顶部真实透视圆盘 + 正确前后半周侧壁) ──
-      const nSteps = 48;
-      const topPts: Vec2[] = [];
-      const botPts: Vec2[] = [];
-
-      // Generate points around unit cylinder circle (X = cos, Z = sin)
+      // ── CYLINDER: Render 32-gon top, bottom, and side quads with full camera sorting ──
+      const nSteps = 32;
+      const topPtsLocal: [number, number, number][] = [];
+      const botPtsLocal: [number, number, number][] = [];
       for (let i = 0; i < nSteps; i++) {
         const theta = (i / nSteps) * Math.PI * 2;
-        topPts.push(proj3D(Math.cos(theta),  1, Math.sin(theta)));
-        botPts.push(proj3D(Math.cos(theta), -1, Math.sin(theta)));
+        topPtsLocal.push([Math.cos(theta), 1, Math.sin(theta)]);
+        botPtsLocal.push([Math.cos(theta), -1, Math.sin(theta)]);
       }
 
-      // Find extreme left and right silhouette tangent indices in screen space:
-      let minIdx = 0, maxIdx = 0;
-      for (let i = 1; i < nSteps; i++) {
-        if (topPts[i].x < topPts[minIdx].x) minIdx = i;
-        if (topPts[i].x > topPts[maxIdx].x) maxIdx = i;
+      // Top Disc (+Y): order (0, 1, 2, ... nSteps-1) in CCW around +Y
+      const topDiscOrdered: [number, number, number][] = [];
+      for (let i = 0; i < nSteps; i++) topDiscOrdered.push(topPtsLocal[i]);
+      addPolygonFace(topDiscOrdered, 'cyl_top', (pts) => {
+        const pFront = proj3D(0, 1, 1), pBack = proj3D(0, 1, -1);
+        const grad = overlayCtx.createLinearGradient(pFront.x, pFront.y, pBack.x, pBack.y);
+        grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
+
+      // Bottom Disc (-Y): reverse order
+      const botDiscOrdered: [number, number, number][] = [];
+      for (let i = nSteps - 1; i >= 0; i--) botDiscOrdered.push(botPtsLocal[i]);
+      addPolygonFace(botDiscOrdered, 'cyl_bot', (pts) => {
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        overlayCtx.lineWidth = 1;
+        overlayCtx.stroke();
+      });
+
+      // Side Quads:
+      for (let i = 0; i < nSteps; i++) {
+        const next = (i + 1) % nSteps;
+        const quad: [number, number, number][] = [
+          topPtsLocal[i],
+          topPtsLocal[next],
+          botPtsLocal[next],
+          botPtsLocal[i]
+        ];
+        const thetaMid = ((i + 0.5) / nSteps) * Math.PI * 2;
+        // Map angle around circle to pure black (left: theta ~ PI) -> base (theta ~ PI/2) -> white (theta ~ 0)
+        const frac = 0.5 + 0.5 * Math.sin(thetaMid);
+        addPolygonFace(quad, 'cyl_side', (pts) => {
+          overlayCtx.beginPath();
+          overlayCtx.moveTo(pts[0].x, pts[0].y);
+          for (let j = 1; j < 4; j++) overlayCtx.lineTo(pts[j].x, pts[j].y);
+          overlayCtx.closePath();
+          // Tone based on horizontal position
+          const rTone = Math.round(baseCol.r * frac + (1 - frac) * (Math.cos(thetaMid) > 0 ? 255 : 0));
+          const gTone = Math.round(baseCol.g * frac + (1 - frac) * (Math.cos(thetaMid) > 0 ? 255 : 0));
+          const bTone = Math.round(baseCol.b * frac + (1 - frac) * (Math.cos(thetaMid) > 0 ? 255 : 0));
+          overlayCtx.fillStyle = `rgb(${rTone}, ${gTone}, ${bTone})`;
+          overlayCtx.fill();
+        });
       }
-
-      // Build Front Half-Arc from minIdx (left) to maxIdx (right) facing camera (larger Y on screen)
-      const frontTopArc: Vec2[] = [];
-      const frontBotArc: Vec2[] = [];
-      let cur = minIdx;
-      while (true) {
-        frontTopArc.push(topPts[cur]);
-        frontBotArc.push(botPts[cur]);
-        if (cur === maxIdx) break;
-        cur = (cur + 1) % nSteps;
-      }
-      // If the chosen arc is on the back (smaller screen Y), take the other way:
-      const midPoint = frontTopArc[Math.floor(frontTopArc.length / 2)];
-      const oppIdx = (minIdx + Math.floor(nSteps / 2)) % nSteps;
-      if (midPoint.y < topPts[oppIdx].y) {
-        frontTopArc.length = 0;
-        frontBotArc.length = 0;
-        let c2 = maxIdx;
-        while (true) {
-          frontTopArc.push(topPts[c2]);
-          frontBotArc.push(botPts[c2]);
-          if (c2 === minIdx) break;
-          c2 = (c2 + 1) % nSteps;
-        }
-      }
-
-      const pLeftT = topPts[minIdx], pLeftB = botPts[minIdx];
-      const pRightT = topPts[maxIdx], pRightB = botPts[maxIdx];
-
-      // 1. Cylinder Front Side Mesh
-      const gradCyl = overlayCtx.createLinearGradient(pLeftT.x, pLeftT.y, pRightT.x, pRightT.y);
-      gradCyl.addColorStop(0, '#000000');
-      gradCyl.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-      gradCyl.addColorStop(1, '#ffffff');
-
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(frontTopArc[0].x, frontTopArc[0].y);
-      for (let i = 1; i < frontTopArc.length; i++) overlayCtx.lineTo(frontTopArc[i].x, frontTopArc[i].y);
-      for (let i = frontBotArc.length - 1; i >= 0; i--) overlayCtx.lineTo(frontBotArc[i].x, frontBotArc[i].y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradCyl;
-      overlayCtx.fill();
-
-      // 2. Cylinder Side Vertical Shading (Top -> Bottom)
-      const gradCylDepth = overlayCtx.createLinearGradient(
-        (pLeftT.x + pRightT.x) / 2, (pLeftT.y + pRightT.y) / 2,
-        (pLeftB.x + pRightB.x) / 2, (pLeftB.y + pRightB.y) / 2
-      );
-      gradCylDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      gradCylDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.15)');
-      gradCylDepth.addColorStop(1, 'rgba(20, 20, 20, 0.65)');
-
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(frontTopArc[0].x, frontTopArc[0].y);
-      for (let i = 1; i < frontTopArc.length; i++) overlayCtx.lineTo(frontTopArc[i].x, frontTopArc[i].y);
-      for (let i = frontBotArc.length - 1; i >= 0; i--) overlayCtx.lineTo(frontBotArc[i].x, frontBotArc[i].y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradCylDepth;
-      overlayCtx.fill();
-
-      // Bottom Front Outline Curve
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(frontBotArc[0].x, frontBotArc[0].y);
-      for (let i = 1; i < frontBotArc.length; i++) overlayCtx.lineTo(frontBotArc[i].x, frontBotArc[i].y);
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.stroke();
-
-      // 3. Cylinder Top Disc (Temperature Gradient - Front to Back)
-      // Find front-most (max Y) and back-most (min Y) in topPts
-      let topFrontIdx = 0, topBackIdx = 0;
-      for (let i = 1; i < nSteps; i++) {
-        if (topPts[i].y > topPts[topFrontIdx].y) topFrontIdx = i;
-        if (topPts[i].y < topPts[topBackIdx].y) topBackIdx = i;
-      }
-      const pFrontTop = topPts[topFrontIdx];
-      const pBackTop = topPts[topBackIdx];
-
-      const gradTopDisc = overlayCtx.createLinearGradient(pFrontTop.x, pFrontTop.y, pBackTop.x, pBackTop.y);
-      gradTopDisc.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-      gradTopDisc.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
-
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(topPts[0].x, topPts[0].y);
-      for (let i = 1; i < nSteps; i++) overlayCtx.lineTo(topPts[i].x, topPts[i].y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradTopDisc;
-      overlayCtx.fill();
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.stroke();
-
-      // Side Silhouette Edge Lines (Left & Right vertical seam borders)
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(pLeftT.x, pLeftT.y);
-      overlayCtx.lineTo(pLeftB.x, pLeftB.y);
-      overlayCtx.moveTo(pRightT.x, pRightT.y);
-      overlayCtx.lineTo(pRightB.x, pRightB.y);
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.stroke();
     } else {
-      // ── 4. CUBE & CUBOID (正方体 / 长方体) ──
-      const isPitchNeg = pitchVal < 0;
-
-      if (isPitchNeg) {
-        // ── Looking up from below (Pitch < 0): Render Bottom Face + Front SAT Faces ──
-        // 1. Bottom Face: (B_back -> B_left -> B_front -> B_right)
-        const gradBot = overlayCtx.createLinearGradient(B_front.x, B_front.y, B_back.x, B_back.y);
-        gradBot.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-        gradBot.addColorStop(1, 'rgba(20, 20, 20, 0.85)');
-
+      // ── CUBE & CUBOID: 6 Fully Defined Faces with Real Camera Dynamic Culling & Lighting ──
+      // 1. Top Face (+Y): (-1, 1, -1) -> (-1, 1, 1) -> (1, 1, 1) -> (1, 1, -1)
+      addPolygonFace([[-1, 1, -1], [-1, 1, 1], [1, 1, 1], [1, 1, -1]], 'top', (pts) => {
+        const pFront = proj3D(0, 1, 1), pBack = proj3D(0, 1, -1);
+        const grad = overlayCtx.createLinearGradient(pFront.x, pFront.y, pBack.x, pBack.y);
+        grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
         overlayCtx.beginPath();
-        overlayCtx.moveTo(B_back.x, B_back.y);
-        overlayCtx.lineTo(B_right.x, B_right.y);
-        overlayCtx.lineTo(B_front.x, B_front.y);
-        overlayCtx.lineTo(B_left.x, B_left.y);
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
         overlayCtx.closePath();
-        overlayCtx.fillStyle = gradBot;
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
+
+      // 2. Bottom Face (-Y): (-1, -1, -1) -> (1, -1, -1) -> (1, -1, 1) -> (-1, -1, 1)
+      addPolygonFace([[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1]], 'bot', (pts) => {
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = 'rgba(20, 20, 20, 0.9)';
         overlayCtx.fill();
         overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
         overlayCtx.lineWidth = 1;
         overlayCtx.stroke();
-      } else {
-        // ── Looking down from above (Pitch >= 0): Render Top Face ──
-        // 1. Top Face: Temperature Gradient
-        const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
-        gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-        gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+      });
 
+      // 3. Front Face (+Z): (-1, 1, 1) -> (-1, -1, 1) -> (1, -1, 1) -> (1, 1, 1)
+      addPolygonFace([[-1, 1, 1], [-1, -1, 1], [1, -1, 1], [1, 1, 1]], 'front', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[0].x, pts[0].y, pts[3].x, pts[3].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, '#ffffff');
         overlayCtx.beginPath();
-        overlayCtx.moveTo(T_back.x, T_back.y);
-        overlayCtx.lineTo(T_right.x, T_right.y);
-        overlayCtx.lineTo(T_front.x, T_front.y);
-        overlayCtx.lineTo(T_left.x, T_left.y);
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
         overlayCtx.closePath();
-        overlayCtx.fillStyle = gradTop;
+        overlayCtx.fillStyle = grad;
         overlayCtx.fill();
-        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        overlayCtx.lineWidth = 1;
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        overlayCtx.lineWidth = 1.2;
         overlayCtx.stroke();
-      }
+      });
 
-      // 2 & 3. Unified Seamless SAT Faces (Continuous Black <-> Base Color <-> White, No center crease)
-      const gradSat = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
-      gradSat.addColorStop(0, '#000000');                                         // Leftmost: Pure Black
-      gradSat.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`); // Center: Pure Vibrant Base Color
-      gradSat.addColorStop(1, '#ffffff');                                         // Rightmost: Pure White
+      // 4. Back Face (-Z): (1, 1, -1) -> (1, -1, -1) -> (-1, -1, -1) -> (-1, 1, -1)
+      addPolygonFace([[1, 1, -1], [1, -1, -1], [-1, -1, -1], [-1, 1, -1]], 'back', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[3].x, pts[3].y, pts[0].x, pts[0].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_left.x, T_left.y);
-      overlayCtx.lineTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(B_right.x, B_right.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.lineTo(B_left.x, B_left.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradSat;
-      overlayCtx.fill();
+      // 5. Right Face (+X): (1, 1, 1) -> (1, -1, 1) -> (1, -1, -1) -> (1, 1, -1)
+      addPolygonFace([[1, 1, 1], [1, -1, 1], [1, -1, -1], [1, 1, -1]], 'right', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[0].x, pts[0].y, pts[3].x, pts[3].y);
+        grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        grad.addColorStop(1, '#ffffff');
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
 
-      // Vertical shading gradient from top to bottom
-      const gradDepth = overlayCtx.createLinearGradient(T_front.x, T_front.y, B_front.x, B_front.y);
-      gradDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      gradDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.18)');
-      gradDepth.addColorStop(1, 'rgba(30, 30, 30, 0.55)');
+      // 6. Left Face (-X): (-1, 1, -1) -> (-1, -1, -1) -> (-1, -1, 1) -> (-1, 1, 1)
+      addPolygonFace([[-1, 1, -1], [-1, -1, -1], [-1, -1, 1], [-1, 1, 1]], 'left', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[0].x, pts[0].y, pts[3].x, pts[3].y);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) overlayCtx.lineTo(pts[i].x, pts[i].y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = grad;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        overlayCtx.lineWidth = 1.2;
+        overlayCtx.stroke();
+      });
+    }
 
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_left.x, T_left.y);
-      overlayCtx.lineTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(B_right.x, B_right.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.lineTo(B_left.x, B_left.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradDepth;
-      overlayCtx.fill();
-
-      // Outline for seamless faces
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_left.x, T_left.y);
-      overlayCtx.lineTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(B_right.x, B_right.y);
-      overlayCtx.lineTo(B_front.x, B_front.y);
-      overlayCtx.lineTo(B_left.x, B_left.y);
-      overlayCtx.lineTo(T_left.x, T_left.y);
-      overlayCtx.closePath();
-      overlayCtx.moveTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_left.x, T_left.y);
-      overlayCtx.moveTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.stroke();
+    // Sort visible front-facing polygons from farthest (smallest Z) to nearest (largest Z) -> Painter's Algorithm
+    facesToRender.sort((a, b) => a.depth - b.depth);
+    for (const f of facesToRender) {
+      f.draw();
     }
 
     // ── 4. Complete 360° Alpha Ring (Full Circle with Integrated Checkerboard Texture) ──
@@ -1144,24 +1187,53 @@ export function renderRoundedBox(
     overlayCtx.restore();
 
     // ── Current 3D Coordinate Pick Circle Dot ──
-    // 2D Outer Hull of the visible Shape on screen:
-    let hull: Vec2[];
+    // Compute true 2D Convex Hull of all projected vertices for any shape at any yaw/pitch angle:
+    const allProjPts: Vec2[] = [];
     if (isPyramid) {
-      hull = [ApexTop, B_right, B_front, B_left];
+      allProjPts.push(proj3D(0, 1.35, 0), proj3D(-1, -1, -1), proj3D(1, -1, -1), proj3D(1, -1, 1), proj3D(-1, -1, 1));
     } else if (isPyramidInv) {
-      hull = [T_back, T_right, ApexBottom, T_left];
+      allProjPts.push(proj3D(0, -1.35, 0), proj3D(-1, 1, -1), proj3D(1, 1, -1), proj3D(1, 1, 1), proj3D(-1, 1, 1));
     } else if (isCylinder) {
-      const pLeftT = proj3D(-1, 1, 0), pRightT = proj3D(1, 1, 0);
-      const pRightB = proj3D(1, -1, 0), pLeftB = proj3D(-1, -1, 0);
-      const pBackT = proj3D(0, 1, -1), pFrontB = proj3D(0, -1, 1);
-      hull = [pBackT, pRightT, pRightB, pFrontB, pLeftB, pLeftT];
-    } else {
-      if (pitchVal < 0) {
-        hull = [T_front, T_right, B_right, B_back, B_left, T_left];
-      } else {
-        hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+      for (let i = 0; i < 16; i++) {
+        const th = (i / 16) * Math.PI * 2;
+        allProjPts.push(proj3D(Math.cos(th), 1, Math.sin(th)));
+        allProjPts.push(proj3D(Math.cos(th), -1, Math.sin(th)));
       }
+    } else {
+      allProjPts.push(
+        proj3D(-1, 1, -1), proj3D(1, 1, -1), proj3D(1, 1, 1), proj3D(-1, 1, 1),
+        proj3D(-1, -1, -1), proj3D(1, -1, -1), proj3D(1, -1, 1), proj3D(-1, -1, 1)
+      );
     }
+
+    // Monotone Chain 2D Convex Hull (Graham scan variant):
+    const computeConvexHull = (pts: Vec2[]): Vec2[] => {
+      const sorted = pts.slice().sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+      const lower: Vec2[] = [];
+      for (const p of sorted) {
+        while (lower.length >= 2) {
+          const a = lower[lower.length - 2], b = lower[lower.length - 1];
+          if ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) <= 0) lower.pop();
+          else break;
+        }
+        lower.push(p);
+      }
+      const upper: Vec2[] = [];
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        const p = sorted[i];
+        while (upper.length >= 2) {
+          const a = upper[upper.length - 2], b = upper[upper.length - 1];
+          if ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) <= 0) upper.pop();
+          else break;
+        }
+        upper.push(p);
+      }
+      lower.pop();
+      upper.pop();
+      return lower.concat(upper);
+    };
+
+    const hull = computeConvexHull(allProjPts);
 
     // Helper: Closest point on line segment [p1, p2] to point p
     const closestOnSeg = (p: Vec2, p1: Vec2, p2: Vec2): Vec2 => {

@@ -739,25 +739,53 @@ export function createRoundedBoxPicker(
         return;
       }
 
-      // Check whether pointer is strictly inside the 3D geometry hull
-      let hull: Vec2[];
+      // Compute true 2D Convex Hull of all projected vertices for any shape at any yaw/pitch angle:
+      const allProjPts: Vec2[] = [];
       if (isPyramid) {
-        hull = [ApexTop, B_right, B_front, B_left];
+        allProjPts.push(proj(0, 1.35, 0), proj(-1, -1, -1), proj(1, -1, -1), proj(1, -1, 1), proj(-1, -1, 1));
       } else if (isPyramidInv) {
-        hull = [T_back, T_right, ApexBottom, T_left];
+        allProjPts.push(proj(0, -1.35, 0), proj(-1, 1, -1), proj(1, 1, -1), proj(1, 1, 1), proj(-1, 1, 1));
       } else if (isCylinder) {
-        const pLeftT = proj(-1, 1, 0), pRightT = proj(1, 1, 0);
-        const pRightB = proj(1, -1, 0), pLeftB = proj(-1, -1, 0);
-        const pBackT = proj(0, 1, -1), pFrontB = proj(0, -1, 1);
-        hull = [pBackT, pRightT, pRightB, pFrontB, pLeftB, pLeftT];
-      } else {
-        if (radPitch < 0) {
-          hull = [T_front, T_right, B_right, B_back, B_left, T_left];
-        } else {
-          hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+        for (let i = 0; i < 16; i++) {
+          const th = (i / 16) * Math.PI * 2;
+          allProjPts.push(proj(Math.cos(th), 1, Math.sin(th)));
+          allProjPts.push(proj(Math.cos(th), -1, Math.sin(th)));
         }
+      } else {
+        allProjPts.push(
+          proj(-1, 1, -1), proj(1, 1, -1), proj(1, 1, 1), proj(-1, 1, 1),
+          proj(-1, -1, -1), proj(1, -1, -1), proj(1, -1, 1), proj(-1, -1, 1)
+        );
       }
-      
+
+      const computeConvexHull = (pts: Vec2[]): Vec2[] => {
+        const sorted = pts.slice().sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+        const lower: Vec2[] = [];
+        for (const pt of sorted) {
+          while (lower.length >= 2) {
+            const a = lower[lower.length - 2], b = lower[lower.length - 1];
+            if ((b.x - a.x) * (pt.y - a.y) - (b.y - a.y) * (pt.x - a.x) <= 0) lower.pop();
+            else break;
+          }
+          lower.push(pt);
+        }
+        const upper: Vec2[] = [];
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          const pt = sorted[i];
+          while (upper.length >= 2) {
+            const a = upper[upper.length - 2], b = upper[upper.length - 1];
+            if ((b.x - a.x) * (pt.y - a.y) - (b.y - a.y) * (pt.x - a.x) <= 0) upper.pop();
+            else break;
+          }
+          upper.push(pt);
+        }
+        lower.pop();
+        upper.pop();
+        return lower.concat(upper);
+      };
+
+      const hull = computeConvexHull(allProjPts);
+
       const pointInPoly = (pt: Vec2, poly: Vec2[]): boolean => {
         let inside = true;
         for (let i = 0; i < poly.length; i++) {
