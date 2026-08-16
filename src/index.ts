@@ -495,7 +495,7 @@ export function createRoundedBoxPicker(
         // Left Click on Box surface: Pick color immediately
         pickColorAtScreen(e.clientX, e.clientY);
         const chosenMode = guides.satMode || 'cube_sat';
-        const delay = guides.holdDelayMs !== undefined ? guides.holdDelayMs : 180;
+        const delay = guides.holdDelayMs !== undefined ? guides.holdDelayMs : 300;
 
         if (chosenMode === 'cube_sat') {
           // Arm 3D Cube SAT on surface press: opens immediately if delay <= 0, or after holdDelayMs / drag
