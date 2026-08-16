@@ -492,11 +492,36 @@ export function createRoundedBoxPicker(
           e.preventDefault();
         }
       } else if (raycastAt(e.clientX, e.clientY)) {
-        // Left Click / Drag on Box surface = Color Pick (re-anchors the triangle to the new color)
-        isPicking = true;
-        svAnchor = null;
-        svMix = null;
+        // Left Click on Box surface: Pick color immediately
         pickColorAtScreen(e.clientX, e.clientY);
+        const chosenMode = guides.satMode || 'cube_sat';
+        const delay = guides.holdDelayMs !== undefined ? guides.holdDelayMs : 180;
+
+        if (chosenMode === 'cube_sat') {
+          // Arm 3D Cube SAT on surface press: opens immediately if delay <= 0, or after holdDelayMs / drag
+          isCubeSatDrag = true;
+          cubeSatPressPt = toCanvas(e.clientX, e.clientY);
+          cubeSatAnchor = dotScreenPos();
+          cubeSatColorAnchor = { ...dotValues };
+          cubeSatCoord = { x: 0.5, y: 0.5, z: 0.5 };
+
+          if (delay <= 0) {
+            cubeSatOpened = true;
+            animateCubeSat(1);
+          } else {
+            cubeSatOpened = false;
+            cubeSatArmTimer = window.setTimeout(() => {
+              cubeSatOpened = true;
+              animateCubeSat(1);
+            }, delay);
+          }
+          isPicking = true;
+          e.preventDefault();
+        } else {
+          isPicking = true;
+          svAnchor = null;
+          svMix = null;
+        }
       } else {
         // Left Click / Drag on EMPTY area = Tumble (view orbit)
         isTumbling = true;
@@ -941,6 +966,11 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getDotSensitivity: () => guides.dotSensitivity || 36,
+    setHoldDelay: (delayMs: number) => {
+      guides.holdDelayMs = Math.max(0, Math.min(800, delayMs));
+      scheduleRender();
+    },
+    getHoldDelay: () => guides.holdDelayMs !== undefined ? guides.holdDelayMs : 180,
     setRotation: (yawDeg: number, pitchDeg: number) => {
       // Legacy API compatibility: reset object orientation and viewport (Y axis 0 deg)
       objMat = mat3FromEuler(pitchDeg * DEG, 0, yawDeg * DEG);

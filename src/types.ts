@@ -93,6 +93,8 @@ export interface GuideVisibility {
   cubeSatSize: number;
   /** Press hit sensitivity radius for the indicator pick dot in pixels (default 36px, range 12px ~ 80px) */
   dotSensitivity: number;
+  /** Hold duration threshold in milliseconds before triggering 3D Cube SAT on surface press (default 180ms, range 0ms ~ 600ms) */
+  holdDelayMs: number;
 }
 
 export const DEFAULT_GUIDES: GuideVisibility = {
@@ -108,6 +110,7 @@ export const DEFAULT_GUIDES: GuideVisibility = {
   cubeSatMapping: 'temp_sat_bri',
   cubeSatSize: 165,
   dotSensitivity: 36,
+  holdDelayMs: 180,
 };
 
 export const AXIS_LABELS: Record<ColorMode, [string, string, string]> = {
@@ -137,6 +140,8 @@ export interface RoundedBoxColorPicker {
   getCubeSatSize(): number;
   setDotSensitivity(radiusPx: number): void;
   getDotSensitivity(): number;
+  setHoldDelay(delayMs: number): void;
+  getHoldDelay(): number;
   setRotation(yawDeg: number, pitchDeg: number): void;
   getAxisRotation(): { rotXDeg: number; rotYDeg: number; rotZDeg: number };
   /**
