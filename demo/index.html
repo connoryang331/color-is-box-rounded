@@ -211,6 +211,65 @@
     border-color: var(--border-slider-hover);
   }
 
+  /* 10 Quick Preset Icons Bar (Above ROT X) */
+  .preset-icon-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 5px 6px;
+    background: var(--bg-btn);
+    border: 1px solid var(--border-btn);
+    border-radius: 8px;
+    user-select: none;
+  }
+  .preset-icon-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--text-label);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+  }
+  .preset-icon-btn:hover {
+    background: var(--bg-btn-hover);
+    color: var(--text-val);
+    border-color: var(--border-slider-hover);
+    transform: translateY(-1px);
+  }
+  .preset-icon-btn.active {
+    background: var(--bg-panel);
+    color: #3b82f6;
+    border-color: #3b82f6;
+    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.25);
+  }
+  .preset-save-icon-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--text-label);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+  }
+  .preset-save-icon-btn:hover {
+    background: #10b98120;
+    color: #10b981;
+    border-color: #10b981;
+  }
+
   /* Top Floating Actions: Title on Left, Actions on Right */
   .top-navbar {
     position: fixed;
@@ -396,6 +455,43 @@
       </div>
     </div>
     <div class="rows">
+      <!-- 10 Icon-Only Presets Bar + Save Current Preset Icon -->
+      <div class="preset-icon-bar" id="preset-icon-bar">
+        <button class="preset-icon-btn active" data-preset="0" title="Preset 1 (Default Isometric)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="1" title="Preset 2 (Front Orthographic)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="2" title="Preset 3 (Top-Down Plan)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v18"></path><path d="M3 12h18"></path></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="3" title="Preset 4 (Pyramid SAT)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 22h20L12 2z"></path></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="4" title="Preset 5 (Inverted Pyramid SAT)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22L2 2h20L12 22z"></path></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="5" title="Preset 6 (Cylinder SAT)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 5v14c0 1.66-4 3-9 3s-9-1.34-9-3V5"></path></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="6" title="Preset 7 (Compact 3D SAT)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="7" title="Preset 8 (Wide Cuboid)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="8" title="Preset 9 (High-Contrast Shadow)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor"></path></svg>
+        </button>
+        <button class="preset-icon-btn" data-preset="9" title="Preset 10 (Large Alpha Orbital Ring)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle></svg>
+        </button>
+        <button class="preset-save-icon-btn" id="btn-save-preset" title="Save current settings to active preset slot">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        </button>
+      </div>
+
       <!-- 3D Rotation Controls -->
       <div class="row" style="padding-top: 0;">
         <span class="label" style="color: #ef4444;">ROT X</span>
@@ -1256,6 +1352,130 @@
       copyToClipboard(JSON.stringify(collectParams(), null, 2));
       flashCopied(e.currentTarget);
     });
+
+    // ── 10 Presets Management with Local Storage Persistence ──
+    const DEFAULT_PRESETS = [
+      { // 0: Default Isometric
+        rotX: 8.0, rotY: -20.0, rotZ: -55.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 1.0, radius: 0.22,
+        satShape: 'cube', sat3DMapping: 'temp_sat_bri', sat3DSize: 165, sat3DPitch: 19, sat3DYaw: -33, alphaRingRadius: 0.92, alphaRingWidth: 16
+      },
+      { // 1: Front Orthographic
+        rotX: 0.0, rotY: 0.0, rotZ: 0.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 1.1, radius: 0.15,
+        satShape: 'cube', sat3DMapping: 'hsv', sat3DSize: 160, sat3DPitch: 0, sat3DYaw: 0, alphaRingRadius: 0.90, alphaRingWidth: 16
+      },
+      { // 2: Top-Down Plan
+        rotX: 90.0, rotY: 0.0, rotZ: 0.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 1.0, radius: 0.20,
+        satShape: 'cylinder', sat3DMapping: 'temp_sat_bri', sat3DSize: 175, sat3DPitch: 45, sat3DYaw: -30, alphaRingRadius: 0.95, alphaRingWidth: 16
+      },
+      { // 3: Pyramid SAT
+        rotX: 15.0, rotY: -25.0, rotZ: -45.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 1.0, radius: 0.22,
+        satShape: 'pyramid', sat3DMapping: 'temp_sat_bri', sat3DSize: 180, sat3DPitch: 25, sat3DYaw: -35, alphaRingRadius: 0.95, alphaRingWidth: 16
+      },
+      { // 4: Inverted Pyramid SAT
+        rotX: 12.0, rotY: -18.0, rotZ: -50.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 1.0, radius: 0.22,
+        satShape: 'pyramid_inverted', sat3DMapping: 'temp_sat_bri', sat3DSize: 180, sat3DPitch: 20, sat3DYaw: -30, alphaRingRadius: 0.95, alphaRingWidth: 16
+      },
+      { // 5: Cylinder SAT
+        rotX: 18.0, rotY: -30.0, rotZ: -40.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 1.0, radius: 0.22,
+        satShape: 'cylinder', sat3DMapping: 'temp_sat_bri', sat3DSize: 170, sat3DPitch: 22, sat3DYaw: -33, alphaRingRadius: 0.92, alphaRingWidth: 16
+      },
+      { // 6: Compact 3D SAT
+        rotX: 10.0, rotY: -15.0, rotZ: -60.0, sizeX: 0.85, sizeY: 0.85, sizeZ: 0.85, zoom: 1.15, radius: 0.18,
+        satShape: 'cube', sat3DMapping: 'temp_sat_bri', sat3DSize: 120, sat3DPitch: 15, sat3DYaw: -25, alphaRingRadius: 0.85, alphaRingWidth: 12
+      },
+      { // 7: Wide Cuboid
+        rotX: 12.0, rotY: -22.0, rotZ: -48.0, sizeX: 1.4, sizeY: 0.8, sizeZ: 1.0, zoom: 0.95, radius: 0.25,
+        satShape: 'cuboid', sat3DMapping: 'temp_sat_bri', sat3DSize: 190, sat3DPitch: 18, sat3DYaw: -35, alphaRingRadius: 0.95, alphaRingWidth: 16
+      },
+      { // 8: High-Contrast OKLCH
+        rotX: 22.0, rotY: -35.0, rotZ: -30.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 1.0, radius: 0.22,
+        satShape: 'cube', sat3DMapping: 'oklch', sat3DSize: 170, sat3DPitch: 25, sat3DYaw: -40, alphaRingRadius: 0.92, alphaRingWidth: 16
+      },
+      { // 9: Large Alpha Orbital Ring
+        rotX: 8.0, rotY: -20.0, rotZ: -55.0, sizeX: 1.0, sizeY: 1.0, sizeZ: 1.0, zoom: 0.95, radius: 0.22,
+        satShape: 'cube', sat3DMapping: 'temp_sat_bri', sat3DSize: 150, sat3DPitch: 19, sat3DYaw: -33, alphaRingRadius: 1.15, alphaRingWidth: 20
+      },
+    ];
+
+    let userPresets = JSON.parse(localStorage.getItem('color_picker_presets_v1') || 'null');
+    if (!userPresets || !Array.isArray(userPresets) || userPresets.length !== 10) {
+      userPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+    }
+
+    let activePresetIdx = 0;
+
+    const applyPreset = (idx) => {
+      activePresetIdx = idx;
+      const p = userPresets[idx] || DEFAULT_PRESETS[idx];
+      if (!p) return;
+
+      // Update 3D Orientation & Dimensions
+      picker.resetRotation(p.rotX, p.rotY, p.rotZ);
+      picker.setDimensions(p.sizeX, p.sizeY, p.sizeZ);
+      picker.setZoom(p.zoom);
+      picker.setRadius(p.radius);
+
+      // Update 3D SAT Shape & Parameters
+      if (p.satShape) picker.setSatShape(p.satShape);
+      if (p.sat3DMapping) picker.setSat3DMapping(p.sat3DMapping);
+      if (p.sat3DSize) picker.setSat3DSize(p.sat3DSize);
+      if (p.sat3DPitch !== undefined && p.sat3DYaw !== undefined) {
+        picker.setSat3DOrientation(p.sat3DPitch, p.sat3DYaw);
+      }
+      if (p.alphaRingRadius) picker.setAlphaRingRadius(p.alphaRingRadius);
+      if (p.alphaRingWidth) picker.setAlphaRingWidth(p.alphaRingWidth);
+
+      // Sync UI Controls
+      const shapeRadio = document.querySelector(`input[name="sat-shape-choice"][value="${p.satShape}"]`);
+      if (shapeRadio) shapeRadio.checked = true;
+      const mapRadio = document.querySelector(`input[name="cube-mapping-rule"][value="${p.sat3DMapping}"]`);
+      if (mapRadio) mapRadio.checked = true;
+
+      // Update active button state
+      document.querySelectorAll('.preset-icon-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i === idx);
+      });
+    };
+
+    document.querySelectorAll('.preset-icon-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(btn.getAttribute('data-preset'), 10);
+        applyPreset(idx);
+      });
+    });
+
+    const saveCurrentToPreset = () => {
+      const rot = picker.getAxisRotation();
+      const dim = picker.getDimensions();
+      const g = picker.getGuides();
+      userPresets[activePresetIdx] = {
+        rotX: rot.rotXDeg,
+        rotY: rot.rotYDeg,
+        rotZ: rot.rotZDeg,
+        sizeX: dim.sizeX,
+        sizeY: dim.sizeY,
+        sizeZ: dim.sizeZ,
+        zoom: Math.round(picker.getZoom() * 100) / 100,
+        radius: Math.round(picker.getRadius() * 1000) / 1000,
+        satShape: g.satShape || 'cube',
+        sat3DMapping: g.sat3DMapping || g.cubeSatMapping || 'temp_sat_bri',
+        sat3DSize: g.sat3DSize || g.cubeSatSize || 165,
+        sat3DPitch: g.sat3DPitch !== undefined ? g.sat3DPitch : 19,
+        sat3DYaw: g.sat3DYaw !== undefined ? g.sat3DYaw : -33,
+        alphaRingRadius: g.alphaRingRadius || 0.92,
+        alphaRingWidth: g.alphaRingWidth || 16,
+      };
+      localStorage.setItem('color_picker_presets_v1', JSON.stringify(userPresets));
+      const btn = document.getElementById('btn-save-preset');
+      btn.style.color = '#10b981';
+      btn.style.background = '#10b98130';
+      setTimeout(() => {
+        btn.style.color = '';
+        btn.style.background = '';
+      }, 700);
+    };
+
+    document.getElementById('btn-save-preset').addEventListener('click', saveCurrentToPreset);
 
     const updateLoop = () => {
       sX.update();
