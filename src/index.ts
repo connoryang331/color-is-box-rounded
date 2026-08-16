@@ -632,33 +632,29 @@ export function createRoundedBoxPicker(
       const isTop   = topT1.inside   || topT2.inside;
 
       if (isRight || (p.x > T_front.x && !isTop && p.y >= T_right.y)) {
-        // --- RIGHT FACE: Horizontal Saturation + Vertical Shading ---
+        // --- RIGHT FACE: Horizontal Saturation + Vertical Shading from T_front downwards ---
         const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
         const whiteness = Math.max(0, Math.min(1,
           ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
 
-        const yTopAvg = (T_front.y + T_right.y) / 2;
-        const yBotAvg = (B_front.y + B_right.y) / 2;
-        const vertDown = Math.max(0, Math.min(1, (p.y - yTopAvg) / (yBotAvg - yTopAvg || 1)));
+        const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (B_front.y - T_front.y || 1)));
 
         u = 0.5;                                                // no hue shift
-        v = Math.max(0, Math.min(1, (1 - whiteness) * (1 - 0.5 * vertDown))); // down reduces saturation towards gray
-        w = Math.max(0.2, Math.min(1, 1.0 - 0.4 * vertDown));   // down slightly dims brightness
+        v = Math.max(0, Math.min(1, (1 - whiteness) * (1 - 0.55 * vertDown))); // down reduces saturation towards gray
+        w = Math.max(0.2, Math.min(1, 1.0 - 0.45 * vertDown));  // down dims brightness towards bottom
       } else if (isLeft || (p.x <= T_front.x && !isTop && p.y >= T_left.y)) {
-        // --- LEFT FACE: Horizontal Darkness + Vertical Shading ---
+        // --- LEFT FACE: Horizontal Darkness + Vertical Shading from T_front downwards ---
         const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
         const darkness = Math.max(0, Math.min(1,
           ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
 
-        const yTopAvg = (T_left.y + T_front.y) / 2;
-        const yBotAvg = (B_left.y + B_front.y) / 2;
-        const vertDown = Math.max(0, Math.min(1, (p.y - yTopAvg) / (yBotAvg - yTopAvg || 1)));
+        const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (B_front.y - T_front.y || 1)));
 
         u = 0.5;                                                // no hue shift
-        v = Math.max(0, Math.min(1, 1.0 - 0.4 * vertDown));     // down reduces saturation
-        w = Math.max(0, Math.min(1, (1 - darkness) * (1 - 0.4 * vertDown))); // down reduces brightness
+        v = Math.max(0, Math.min(1, 1.0 - 0.45 * vertDown));    // down reduces saturation
+        w = Math.max(0, Math.min(1, (1 - darkness) * (1 - 0.45 * vertDown))); // down reduces brightness
       } else {
         // --- TOP FACE: Strictly from front corner (T_front) UPWARDS to top apex (T_back) ---
         const gzUp = T_back.x - T_front.x, gyUp = T_back.y - T_front.y;

@@ -735,13 +735,13 @@ export function renderRoundedBox(
     overlayCtx.fillStyle = gradLeft;
     overlayCtx.fill();
 
-    // Left face vertical bottom shade (top pure/vibrant -> bottom desaturated dark gray)
+    // Left face vertical bottom shade: strictly from front vertex (T_front) downwards to bottom vertex (B_front)
     const leftVertShade = overlayCtx.createLinearGradient(
-      (T_left.x + T_front.x) / 2, (T_left.y + T_front.y) / 2,
-      (B_left.x + B_front.x) / 2, (B_left.y + B_front.y) / 2
+      T_front.x, T_front.y,
+      B_front.x, B_front.y
     );
     leftVertShade.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    leftVertShade.addColorStop(1, 'rgba(40, 40, 40, 0.7)');
+    leftVertShade.addColorStop(1, 'rgba(40, 40, 40, 0.75)');
     overlayCtx.fillStyle = leftVertShade;
     overlayCtx.fill();
 
@@ -759,13 +759,13 @@ export function renderRoundedBox(
     overlayCtx.fillStyle = gradRight;
     overlayCtx.fill();
 
-    // Right face vertical bottom shade (top vibrant/pure -> bottom neutral gray)
+    // Right face vertical bottom shade: strictly from front vertex (T_front) downwards to bottom vertex (B_front)
     const rightVertShade = overlayCtx.createLinearGradient(
-      (T_front.x + T_right.x) / 2, (T_front.y + T_right.y) / 2,
-      (B_front.x + B_right.x) / 2, (B_front.y + B_right.y) / 2
+      T_front.x, T_front.y,
+      B_front.x, B_front.y
     );
     rightVertShade.addColorStop(0, 'rgba(128, 128, 128, 0)');
-    rightVertShade.addColorStop(1, 'rgba(110, 110, 110, 0.65)');
+    rightVertShade.addColorStop(1, 'rgba(110, 110, 110, 0.7)');
     overlayCtx.fillStyle = rightVertShade;
     overlayCtx.fill();
 
