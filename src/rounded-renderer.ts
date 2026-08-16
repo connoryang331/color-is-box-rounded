@@ -661,34 +661,39 @@ export function renderRoundedBox(
     const ax = cubeSat.anchor.x;
     const ay = cubeSat.anchor.y;
 
-    // Isometric 3D projection parameters for the SAT cube:
-    // dx = s * cos(30°), dy = s * sin(30°), dz = s
-    const cos30 = 0.866025;
-    const sin30 = 0.5;
-    const dx = s * 0.52 * cos30;
-    const dy = s * 0.52 * sin30;
-    const dz = s * 0.62;
+    // 3D Rotated Perspective for the Cube SAT (rotated slightly to the left, matching 3D preview & real isometric look)
+    // Yaw = -22°, Pitch = 26°
+    const radYaw = -22 * Math.PI / 180;
+    const radPitch = 26 * Math.PI / 180;
+    const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
+    const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
 
-    // Cube Center Origin at (ax, ay)
-    // 8 Isometric Vertices:
-    // Top face:
-    // T_top   = (ax, ay - dz)
-    // T_right = (ax + dx, ay - dz + dy)
-    // T_bot   = (ax, ay - dz + 2*dy)
-    // T_left  = (ax - dx, ay - dz + dy)
-    // Bottom face (shifted down by dz):
-    // B_bot   = (ax, ay + 2*dy)
-    // B_left  = (ax - dx, ay + dy)
-    // B_right = (ax + dx, ay + dy)
+    // 3D projection function from unit cube [-1, 1]^3 to screen (ax, ay)
+    const proj3D = (px: number, py: number, pz: number): Vec2 => {
+      // 1. Rotate Yaw around Y
+      const x1 = px * cy + pz * sy;
+      const y1 = py;
+      const z1 = -px * sy + pz * cy;
+      // 2. Rotate Pitch around X
+      const x2 = x1;
+      const y2 = y1 * cp - z1 * sp;
+      return {
+        x: ax + x2 * s * 0.46,
+        y: ay - y2 * s * 0.46, // Invert Y for canvas
+      };
+    };
 
-    const T_top = { x: ax, y: ay - dz * 0.5 - dy };
-    const T_right = { x: ax + dx, y: ay - dz * 0.5 };
-    const T_bot = { x: ax, y: ay - dz * 0.5 + dy };
-    const T_left = { x: ax - dx, y: ay - dz * 0.5 };
+    // 8 3D Vertices for Cube SAT:
+    // Top 4 vertices (Y = +1):
+    const T_top = proj3D(0, 1, -1);      // Back corner
+    const T_right = proj3D(1, 1, 0);     // Right corner
+    const T_bot = proj3D(0, 1, 1);       // Front corner
+    const T_left = proj3D(-1, 1, 0);     // Left corner
 
-    const B_bot = { x: ax, y: ay + dz * 0.5 + dy };
-    const B_left = { x: ax - dx, y: ay + dz * 0.5 };
-    const B_right = { x: ax + dx, y: ay + dz * 0.5 };
+    // Bottom 4 vertices (Y = -1):
+    const B_bot = proj3D(0, -1, 1);      // Front bottom corner
+    const B_left = proj3D(-1, -1, 0);    // Left bottom corner
+    const B_right = proj3D(1, -1, 0);    // Right bottom corner
 
     // Draw backdrop card (subtle dark glassmorphism card for contrast)
     overlayCtx.save();
@@ -698,7 +703,7 @@ export function renderRoundedBox(
     overlayCtx.fillStyle = 'rgba(28, 28, 28, 0.88)';
     overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
     overlayCtx.lineWidth = 1;
-    const cardW = s * 1.55;
+    const cardW = s * 1.6;
     const cardH = s * 1.75;
     const cardX = ax - cardW * 0.5;
     const cardY = ay - cardH * 0.5;
@@ -757,68 +762,81 @@ export function renderRoundedBox(
     overlayCtx.closePath();
     overlayCtx.fillStyle = gradRight;
     overlayCtx.fill();
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── 4. Icons & White Arrows matching the reference ──
-    overlayCtx.save();
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    overlayCtx.lineWidth = 1.6;
-    overlayCtx.lineCap = 'round';
-    overlayCtx.lineJoin = 'round';
+    // ── Cube Wireframe Accents ──
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(T_top.x, T_top.y);
+    overlayCtx.lineTo(T_right.x, T_right.y);
+    overlayCtx.lineTo(B_right.x, B_right.y);
+    overlayCtx.lineTo(B_bot.x, B_bot.y);
+    overlayCtx.lineTo(B_left.x, B_left.y);
+    overlayCtx.lineTo(T_left.x, T_left.y);
+    overlayCtx.closePath();
+    overlayCtx.moveTo(T_bot.x, T_bot.y);
+    overlayCtx.lineTo(B_bot.x, B_bot.y);
+    overlayCtx.moveTo(T_bot.x, T_bot.y);
+    overlayCtx.lineTo(T_left.x, T_left.y);
+    overlayCtx.moveTo(T_bot.x, T_bot.y);
+    overlayCtx.lineTo(T_right.x, T_right.y);
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    overlayCtx.lineWidth = 1.2;
+    overlayCtx.stroke();
 
-    // Helper: double-ended arrow
-    const drawDoubleArrow = (x1: number, y1: number, x2: number, y2: number, arrowLen = 6) => {
+    // ── 4. Icons and Dual-ended Arrows (Reference: 🌡️ 🌈 🔆) ──
+    overlayCtx.save();
+    overlayCtx.strokeStyle = '#ffffff';
+    overlayCtx.fillStyle = '#ffffff';
+    overlayCtx.lineWidth = 1.4;
+
+    const drawDoubleArrow = (x1: number, y1: number, x2: number, y2: number) => {
       overlayCtx.beginPath();
       overlayCtx.moveTo(x1, y1);
       overlayCtx.lineTo(x2, y2);
       overlayCtx.stroke();
-      const angle = Math.atan2(y2 - y1, x2 - x1);
-      // Arrow at start
+
+      const ang = Math.atan2(y2 - y1, x2 - x1);
+      const head = 4.5;
+      // Arrowhead 1
       overlayCtx.beginPath();
-      overlayCtx.moveTo(x1 + arrowLen * Math.cos(angle + Math.PI / 4), y1 + arrowLen * Math.sin(angle + Math.PI / 4));
-      overlayCtx.lineTo(x1, y1);
-      overlayCtx.lineTo(x1 + arrowLen * Math.cos(angle - Math.PI / 4), y1 + arrowLen * Math.sin(angle - Math.PI / 4));
+      overlayCtx.moveTo(x1, y1);
+      overlayCtx.lineTo(x1 + head * Math.cos(ang + 0.5), y1 + head * Math.sin(ang + 0.5));
+      overlayCtx.moveTo(x1, y1);
+      overlayCtx.lineTo(x1 + head * Math.cos(ang - 0.5), y1 + head * Math.sin(ang - 0.5));
       overlayCtx.stroke();
-      // Arrow at end
+      // Arrowhead 2
       overlayCtx.beginPath();
-      overlayCtx.moveTo(x2 - arrowLen * Math.cos(angle + Math.PI / 4), y2 - arrowLen * Math.sin(angle + Math.PI / 4));
-      overlayCtx.lineTo(x2, y2);
-      overlayCtx.lineTo(x2 - arrowLen * Math.cos(angle - Math.PI / 4), y2 - arrowLen * Math.sin(angle - Math.PI / 4));
+      overlayCtx.moveTo(x2, y2);
+      overlayCtx.lineTo(x2 - head * Math.cos(ang + 0.5), y2 - head * Math.sin(ang + 0.5));
+      overlayCtx.moveTo(x2, y2);
+      overlayCtx.lineTo(x2 - head * Math.cos(ang - 0.5), y2 - head * Math.sin(ang - 0.5));
       overlayCtx.stroke();
     };
 
-    // (A) Top Left: Temperature / Hue (🌡️ + diagonal arrow)
-    const iconTempX = ax - s * 0.42;
-    const iconTempY = ay - s * 0.68;
-    // Draw thermometer SVG path
+    // (A) Top-Left: Thermometer / Temperature (🌡️ + diagonal arrows)
+    const iconTempX = ax - s * 0.44;
+    const iconTempY = ay - s * 0.64;
+    // Draw thermometer icon
     overlayCtx.save();
     overlayCtx.translate(iconTempX, iconTempY);
-    overlayCtx.scale(0.85, 0.85);
     overlayCtx.beginPath();
-    overlayCtx.arc(0, 4, 3.5, 0, Math.PI * 2);
+    overlayCtx.roundRect ? overlayCtx.roundRect(-2.5, -9, 5, 12, 2.5) : overlayCtx.rect(-2.5, -9, 5, 12);
+    overlayCtx.stroke();
+    overlayCtx.beginPath();
+    overlayCtx.arc(0, 5, 4.5, 0, Math.PI * 2);
+    overlayCtx.stroke();
+    overlayCtx.beginPath();
+    overlayCtx.arc(0, 5, 2.5, 0, Math.PI * 2);
     overlayCtx.fill();
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(-1.8, 3);
-    overlayCtx.lineTo(-1.8, -6);
-    overlayCtx.arc(0, -6, 1.8, Math.PI, 0);
-    overlayCtx.lineTo(1.8, 3);
-    overlayCtx.stroke();
-    // Ticks
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(3, -5); overlayCtx.lineTo(5, -5);
-    overlayCtx.moveTo(3, -2); overlayCtx.lineTo(5, -2);
-    overlayCtx.moveTo(3, 1); overlayCtx.lineTo(5, 1);
-    overlayCtx.stroke();
     overlayCtx.restore();
-    // Arrow below thermometer
-    drawDoubleArrow(iconTempX - 16, iconTempY + 14, iconTempX + 16, iconTempY + 6);
+    // Diagonal double arrow along top-left edge
+    drawDoubleArrow(iconTempX + 10, iconTempY - 8, iconTempX + 26, iconTempY + 8);
 
-    // (B) Top Right: Rainbow / Saturation (🌈 + vertical arrow)
-    const iconSatX = ax + s * 0.42;
-    const iconSatY = ay - s * 0.68;
+    // (B) Top-Right: Rainbow / Saturation (🌈 + vertical arrows)
+    const iconSatX = ax + s * 0.44;
+    const iconSatY = ay - s * 0.64;
     // Draw rainbow arcs
     overlayCtx.save();
     overlayCtx.translate(iconSatX - 10, iconSatY);
@@ -834,7 +852,7 @@ export function renderRoundedBox(
 
     // (C) Bottom: Sun / Brightness (🔆 + dual arrows)
     const iconSunX = ax;
-    const iconSunY = ay + dz * 0.5 + dy + 18;
+    const iconSunY = ay + s * 0.58;
     // Draw sun icon
     overlayCtx.save();
     overlayCtx.translate(iconSunX, iconSunY);
@@ -850,8 +868,8 @@ export function renderRoundedBox(
     }
     overlayCtx.restore();
     // Double arrows on both sides of sun
-    drawDoubleArrow(iconSunX - s * 0.58, iconSunY, iconSunX - 16, iconSunY);
-    drawDoubleArrow(iconSunX + 16, iconSunY, iconSunX + s * 0.58, iconSunY);
+    drawDoubleArrow(iconSunX - s * 0.56, iconSunY, iconSunX - 16, iconSunY);
+    drawDoubleArrow(iconSunX + 16, iconSunY, iconSunX + s * 0.56, iconSunY);
     overlayCtx.restore();
 
     // ── 5. Current 3D Coordinate Pick Circle Dot ──
@@ -862,10 +880,10 @@ export function renderRoundedBox(
     const curRgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
-    // Screen position mapped inside the isometric cube volume:
-    // Lerp on the front corner:
-    const pickX = ax + (u - 0.5) * dx * 1.5 + (w - 0.5) * dx * 0.5;
-    const pickY = ay + (u - 0.5) * dy * 0.8 + (1 - v - 0.5) * dz * 0.85;
+    // Screen position mapped through proj3D
+    const pos3D = proj3D((u - 0.5) * 1.6, (v - 0.5) * 1.6, (w - 0.5) * 1.6);
+    const pickX = pos3D.x;
+    const pickY = pos3D.y;
 
     overlayCtx.beginPath();
     overlayCtx.arc(pickX, pickY, 5.5, 0, Math.PI * 2);
@@ -885,4 +903,3 @@ export function renderRoundedBox(
 
   overlayCtx.restore();
 }
-
