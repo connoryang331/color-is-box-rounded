@@ -175,9 +175,20 @@ export function createRoundedBoxPicker(
 
   const animateCubeSat = (target: number) => {
     cubeSatRevealTarget = target;
+    // If dismissing (target === 0), close immediately with crisp instant exit to eliminate trailing shadows
+    if (target === 0) {
+      if (cubeSatAnimFrame !== null) {
+        cancelAnimationFrame(cubeSatAnimFrame);
+        cubeSatAnimFrame = null;
+      }
+      cubeSatReveal = 0;
+      cubeSatAnchor = null;
+      scheduleRender();
+      return;
+    }
     if (cubeSatAnimFrame !== null) return;
     let last = performance.now();
-    const speed = 6.0;
+    const speed = 10.0;
     const step = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
