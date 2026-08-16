@@ -644,7 +644,7 @@ export function createRoundedBoxPicker(
         const darkness = Math.max(0, Math.min(1,
           ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
         // darkness: 0 at front edge (base color), 1 at left edge (black)
-        u = 0.0;
+        u = 0.5;           // no hue shift — (u-0.5)*60 = 0°
         v = 1 - darkness;  // sat: 100% → 0%
         w = 1 - darkness;  // bri: 100% → 0%
       } else {
@@ -655,9 +655,9 @@ export function createRoundedBoxPicker(
         const whiteness = Math.max(0, Math.min(1,
           ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
         // whiteness: 0 at front edge (base color), 1 at right edge (white)
-        u = 0.0;
+        u = 0.5;            // no hue shift
         v = 1 - whiteness;  // sat: 100% → 0%
-        w = 1.0;             // bri: always 100%
+        w = 1.0;            // bri: always 100%
       }
 
       cubeSatPointerPos = p;
