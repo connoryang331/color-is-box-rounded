@@ -690,6 +690,28 @@ export function createRoundedBoxPicker(
         return;
       }
 
+      // Check whether pointer is strictly inside the 3D cube geometry
+      const hull: Vec2[] = [T_back, T_right, B_right, B_front, B_left, T_left];
+      const pointInPoly = (pt: Vec2, poly: Vec2[]): boolean => {
+        let inside = true;
+        for (let i = 0; i < poly.length; i++) {
+          const p1 = poly[i];
+          const p2 = poly[(i + 1) % poly.length];
+          const cross = (p2.x - p1.x) * (pt.y - p1.y) - (p2.y - p1.y) * (pt.x - p1.x);
+          if (cross < 0) {
+            inside = false;
+            break;
+          }
+        }
+        return inside;
+      };
+
+      const isInsideCube = pointInPoly(p, hull);
+      if (!isInsideCube) {
+        // Pointer is in the blank gap between cube and alpha ring: DO NOTHING (ignore completely)
+        return;
+      }
+
       // 1. Check Top Face Quad: Tri1(T_back, T_right, T_front) + Tri2(T_back, T_front, T_left)
       const topT1 = bary(p, T_back, T_right, T_front);
       const topT2 = bary(p, T_back, T_front, T_left);
@@ -708,7 +730,7 @@ export function createRoundedBoxPicker(
       const isLeft  = leftT1.inside  || leftT2.inside;
       const isTop   = topT1.inside   || topT2.inside;
 
-      if (isRight || (p.x > T_front.x && !isTop && p.y >= T_right.y)) {
+      if (isRight) {
         // --- RIGHT FACE: Horizontal Saturation + Vertical Shading from T_front downwards ---
         const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
@@ -720,7 +742,7 @@ export function createRoundedBoxPicker(
         u = 0.5;                                                // no hue shift
         v = Math.max(0, Math.min(1, (1 - whiteness) * (1 - 0.55 * vertDown))); // down reduces saturation towards gray
         w = Math.max(0.2, Math.min(1, 1.0 - 0.45 * vertDown));  // down dims brightness towards bottom
-      } else if (isLeft || (p.x <= T_front.x && !isTop && p.y >= T_left.y)) {
+      } else if (isLeft) {
         // --- LEFT FACE: Horizontal Darkness + Vertical Shading from T_front downwards ---
         const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
@@ -732,7 +754,7 @@ export function createRoundedBoxPicker(
         u = 0.5;                                                // no hue shift
         v = Math.max(0, Math.min(1, 1.0 - 0.45 * vertDown));    // down reduces saturation
         w = Math.max(0, Math.min(1, (1 - darkness) * (1 - 0.45 * vertDown))); // down reduces brightness
-      } else {
+      } else if (isTop) {
         // --- TOP FACE: Strictly from front corner (T_front) UPWARDS to top apex (T_back) ---
         const gzUp = T_back.x - T_front.x, gyUp = T_back.y - T_front.y;
         const len2Up = gzUp * gzUp + gyUp * gyUp || 1;
@@ -748,6 +770,8 @@ export function createRoundedBoxPicker(
         u = 0.5 + 0.5 * upFraction;                 // 0.5 = T_front (base color), 1.0 = T_back (shifted color)
         v = Math.max(0.2, Math.min(1, 0.7 + 0.3 * latFraction));
         w = 1.0;                                     // top face full brightness
+      } else {
+        return;
       }
 
       cubeSatPointerPos = p;
