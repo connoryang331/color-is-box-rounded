@@ -765,52 +765,74 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1.2;
     overlayCtx.stroke();
 
-    // ── Current 3D Coordinate Pick Circle Dot (always confined within cube faces) ──
-    const u = cubeSat.currentCoord.x; // [0, 1]
-    const v = cubeSat.currentCoord.y; // [0, 1]
-    const w = cubeSat.currentCoord.z; // [0, 1]
-
+    // ── Current 3D Coordinate Pick Circle Dot ──
     const curRgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
-    // Direct interpolation on the active face:
-    let pickX = ax;
-    let pickY = ay;
+    // 2D Outer Hull of the visible Cube on screen:
+    // Vertices in clockwise order: T_back -> T_right -> B_right -> B_front -> B_left -> T_left
+    const hull: Vec2[] = [T_back, T_right, B_right, B_front, B_left, T_left];
 
-    if (w >= 0.99) {
-      // Top face: quad (T_back, T_right, T_front, T_left)
-      // u maps left->right (T_left -> T_right), v maps back->front (T_back -> T_front)
-      const topBackX = T_left.x + (T_right.x - T_left.x) * u;
-      const topBackY = T_left.y + (T_right.y - T_left.y) * u;
-      const topFrontX = T_back.x + (T_front.x - T_back.x) * v;
-      const topFrontY = T_back.y + (T_front.y - T_back.y) * v;
-      // Bilinear interpolation on quad:
-      pickX = (1 - v) * (T_left.x + (T_back.x - T_left.x) * (1 - u)) + v * (T_front.x + (T_right.x - T_front.x) * u);
-      pickY = (1 - v) * (T_left.y + (T_back.y - T_left.y) * (1 - u)) + v * (T_front.y + (T_right.y - T_front.y) * u);
-      const pos3D = proj3D((u - 0.5) * 2, 1.0, (v - 0.5) * 2);
-      pickX = pos3D.x;
-      pickY = pos3D.y;
-    } else if (u <= 0.01) {
-      // Left face (X = -1): Z in [-1, 1] (v), Y in [-1, 1] (w)
-      const pos3D = proj3D(-1.0, (w - 0.5) * 2, (v - 0.5) * 2);
-      pickX = pos3D.x;
-      pickY = pos3D.y;
-    } else {
-      // Right face: front face X in [-1, 1] (u), Y in [-1, 1] (w), Z = 1
-      const pos3D = proj3D((u - 0.5) * 2, (w - 0.5) * 2, (v - 0.5) * 2);
-      pickX = pos3D.x;
-      pickY = pos3D.y;
+    // Helper: Closest point on line segment [p1, p2] to point p
+    const closestOnSeg = (p: Vec2, p1: Vec2, p2: Vec2): Vec2 => {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 1e-6) return p1;
+      const t = Math.max(0, Math.min(1, ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq));
+      return { x: p1.x + t * dx, y: p1.y + t * dy };
+    };
+
+    // Helper: Point in convex polygon test
+    const pointInPoly = (p: Vec2, poly: Vec2[]): boolean => {
+      let inside = true;
+      for (let i = 0; i < poly.length; i++) {
+        const p1 = poly[i];
+        const p2 = poly[(i + 1) % poly.length];
+        const cross = (p2.x - p1.x) * (p.y - p1.y) - (p2.y - p1.y) * (p.x - p1.x);
+        if (cross < 0) {
+          inside = false;
+          break;
+        }
+      }
+      return inside;
+    };
+
+    let dotX = ax;
+    let dotY = ay;
+
+    if (cubeSat.pointerPos) {
+      const mouse = cubeSat.pointerPos;
+      if (pointInPoly(mouse, hull)) {
+        // Pointer is inside the 3D cube: dot follows mouse directly (1:1 with zero jump)
+        dotX = mouse.x;
+        dotY = mouse.y;
+      } else {
+        // Pointer is outside: clamp dot to closest point on cube perimeter
+        let minD = Infinity;
+        let bestPt: Vec2 = { x: ax, y: ay };
+        for (let i = 0; i < hull.length; i++) {
+          const pt = closestOnSeg(mouse, hull[i], hull[(i + 1) % hull.length]);
+          const d = (pt.x - mouse.x) ** 2 + (pt.y - mouse.y) ** 2;
+          if (d < minD) {
+            minD = d;
+            bestPt = pt;
+          }
+        }
+        dotX = bestPt.x;
+        dotY = bestPt.y;
+      }
     }
 
     overlayCtx.beginPath();
-    overlayCtx.arc(pickX, pickY, 5.5, 0, Math.PI * 2);
+    overlayCtx.arc(dotX, dotY, 5.5, 0, Math.PI * 2);
     overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
     overlayCtx.fill();
     overlayCtx.strokeStyle = '#ffffff';
     overlayCtx.lineWidth = 2;
     overlayCtx.stroke();
     overlayCtx.beginPath();
-    overlayCtx.arc(pickX, pickY, 6.5, 0, Math.PI * 2);
+    overlayCtx.arc(dotX, dotY, 6.5, 0, Math.PI * 2);
     overlayCtx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
