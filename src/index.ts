@@ -199,6 +199,7 @@ export function createRoundedBoxPicker(
   const rc = initWebGL(container, size);
 
   let cubeSatPointerPos: Vec2 | null = null;
+  let cubeSatSize = 140;
 
   let animId: number | null = null;
   const scheduleRender = () => {
@@ -208,7 +209,7 @@ export function createRoundedBoxPicker(
       renderRoundedBox(
         rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
         ringAnchor ? { anchor: ringAnchor, reveal: ringReveal, band: ringBand, colorAnchor: ringColorAnchor, angle: ringAngle } : null,
-        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: 140, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos } : null,
+        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: cubeSatSize, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos } : null,
         alpha
       );
     });
@@ -572,7 +573,7 @@ export function createRoundedBoxPicker(
         return;
       }
       // 3D Perspective Projection for Cube SAT (identical parameters to renderer):
-      const s = 140;
+      const s = cubeSatSize;
       const radYaw = -33 * Math.PI / 180;
       const radPitch = 19 * Math.PI / 180;
       const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
@@ -793,9 +794,16 @@ export function createRoundedBoxPicker(
     updateCursor(lastMouseX, lastMouseY);
   });
 
-  // Mouse Wheel to Zoom (like Blender 3D)
+  // Mouse Wheel: adjusts 3D Cube SAT size while active; otherwise zooms camera viewport (Blender style)
   rc.canvasGL.addEventListener('wheel', (e) => {
     e.preventDefault();
+    if (isCubeSatDrag || (cubeSatAnchor && cubeSatReveal > 0.01)) {
+      // Scroll wheel to adjust 3D Cube SAT popup scale (80px to 260px)
+      const deltaSize = e.deltaY < 0 ? 12 : -12;
+      cubeSatSize = Math.max(80, Math.min(260, cubeSatSize + deltaSize));
+      scheduleRender();
+      return;
+    }
     const delta = e.deltaY < 0 ? 0.08 : -0.08;
     cam.zoom = Math.max(0.2, Math.min(2.5, (cam.zoom || 1.0) + delta));
     scheduleRender();
