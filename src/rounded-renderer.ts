@@ -945,9 +945,9 @@ export function renderRoundedBox(
         botPtsLocal.push([Math.cos(theta), -1, Math.sin(theta)]);
       }
 
-      // Top Disc (+Y): order (0, 1, 2, ... nSteps-1) in CCW around +Y
+      // Top Disc (+Y): points viewed from +Y looking down to -Y (CCW order: decreasing theta)
       const topDiscOrdered: [number, number, number][] = [];
-      for (let i = 0; i < nSteps; i++) topDiscOrdered.push(topPtsLocal[i]);
+      for (let i = nSteps - 1; i >= 0; i--) topDiscOrdered.push(topPtsLocal[i]);
       addPolygonFace(topDiscOrdered, 'cyl_top', (pts) => {
         const pFront = proj3D(0, 1, 1), pBack = proj3D(0, 1, -1);
         const grad = overlayCtx.createLinearGradient(pFront.x, pFront.y, pBack.x, pBack.y);
@@ -964,9 +964,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // Bottom Disc (-Y): reverse order
+      // Bottom Disc (-Y): points viewed from -Y looking up to +Y (increasing theta)
       const botDiscOrdered: [number, number, number][] = [];
-      for (let i = nSteps - 1; i >= 0; i--) botDiscOrdered.push(botPtsLocal[i]);
+      for (let i = 0; i < nSteps; i++) botDiscOrdered.push(botPtsLocal[i]);
       addPolygonFace(botDiscOrdered, 'cyl_bot', (pts) => {
         overlayCtx.beginPath();
         overlayCtx.moveTo(pts[0].x, pts[0].y);
@@ -979,14 +979,14 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // Side Quads:
+      // Side Quads: (topPts[next] -> topPts[i] -> botPts[i] -> botPts[next])
       for (let i = 0; i < nSteps; i++) {
         const next = (i + 1) % nSteps;
         const quad: [number, number, number][] = [
-          topPtsLocal[i],
           topPtsLocal[next],
-          botPtsLocal[next],
-          botPtsLocal[i]
+          topPtsLocal[i],
+          botPtsLocal[i],
+          botPtsLocal[next]
         ];
         const thetaMid = ((i + 0.5) / nSteps) * Math.PI * 2;
         // Map angle around circle to pure black (left: theta ~ PI) -> base (theta ~ PI/2) -> white (theta ~ 0)
@@ -996,7 +996,6 @@ export function renderRoundedBox(
           overlayCtx.moveTo(pts[0].x, pts[0].y);
           for (let j = 1; j < 4; j++) overlayCtx.lineTo(pts[j].x, pts[j].y);
           overlayCtx.closePath();
-          // Tone based on horizontal position
           const rTone = Math.round(baseCol.r * frac + (1 - frac) * (Math.cos(thetaMid) > 0 ? 255 : 0));
           const gTone = Math.round(baseCol.g * frac + (1 - frac) * (Math.cos(thetaMid) > 0 ? 255 : 0));
           const bTone = Math.round(baseCol.b * frac + (1 - frac) * (Math.cos(thetaMid) > 0 ? 255 : 0));
