@@ -3,7 +3,7 @@ import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, project3D, transform3D, projectSaturationTriangle, SaturationTriangle, easeInOutQuad } from './camera-math';
 import { drawGuides } from './guide-renderer';
 import { VERT_SHADER, FRAG_SHADER, TRI_VERT_SHADER, TRI_FRAG_SHADER } from './shaders';
-import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb, ringColorAt } from './color-math';
+import { rgbToHex, rgbToHsb, rgbToOklch, valuesToRgb, ringColorAt, hsbToRgb } from './color-math';
 
 /** Radius of the center color plate, in canvas px. */
 export const RING_CENTER_R = 20;
