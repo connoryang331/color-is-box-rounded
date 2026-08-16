@@ -650,21 +650,20 @@ export function createRoundedBoxPicker(
         v = 1.0;            // full sat
         w = 1 - darkness;   // bri: 100% → 0% (pure black)
       } else {
-        // --- TOP FACE: Temperature (u) & Saturation (v) ---
-        // Project onto T_left -> T_right vector for cold <-> warm temperature:
-        const gxTop = T_right.x - T_left.x, gyTop = T_right.y - T_left.y;
-        const len2Top = gxTop * gxTop + gyTop * gyTop || 1;
-        const tempFraction = Math.max(0, Math.min(1,
-          ((p.x - T_left.x) * gxTop + (p.y - T_left.y) * gyTop) / len2Top));
-
-        // Depth axis (T_back -> T_front) for saturation:
+        // --- TOP FACE: Temperature along depth (T_back -> T_front) ---
         const gzDepth = T_front.x - T_back.x, gyDepth = T_front.y - T_back.y;
         const len2Depth = gzDepth * gzDepth + gyDepth * gyDepth || 1;
         const depthFraction = Math.max(0, Math.min(1,
           ((p.x - T_back.x) * gzDepth + (p.y - T_back.y) * gyDepth) / len2Depth));
 
-        u = tempFraction;                           // 0 = cold (-30°), 0.5 = base color, 1 = warm (+30°)
-        v = Math.max(0.2, Math.min(1, 0.4 + 0.6 * depthFraction)); // depth modifies saturation
+        // Lateral (T_left -> T_right) for saturation:
+        const gxTop = T_right.x - T_left.x, gyTop = T_right.y - T_left.y;
+        const len2Top = gxTop * gxTop + gyTop * gyTop || 1;
+        const latFraction = Math.max(0, Math.min(1,
+          ((p.x - T_left.x) * gxTop + (p.y - T_left.y) * gyTop) / len2Top));
+
+        u = depthFraction;                          // 0 = back (cool/top), 0.5 = center (base), 1 = front (warm/bottom)
+        v = Math.max(0.2, Math.min(1, 0.5 + (latFraction - 0.5) * 0.8));
         w = 1.0;                                     // top face full brightness
       }
 
