@@ -1244,19 +1244,19 @@ export function renderRoundedBox(
       return { x: p1.x + t * dx, y: p1.y + t * dy };
     };
 
-    // Helper: Point in convex polygon test
+    // Helper: Point in convex polygon test (works for both CCW and CW order)
     const pointInPoly = (p: Vec2, poly: Vec2[]): boolean => {
-      let inside = true;
+      if (!poly || poly.length < 3) return false;
+      let pos = 0, neg = 0;
       for (let i = 0; i < poly.length; i++) {
         const p1 = poly[i];
         const p2 = poly[(i + 1) % poly.length];
         const cross = (p2.x - p1.x) * (p.y - p1.y) - (p2.y - p1.y) * (p.x - p1.x);
-        if (cross < 0) {
-          inside = false;
-          break;
-        }
+        if (cross > 1e-6) pos++;
+        else if (cross < -1e-6) neg++;
+        if (pos > 0 && neg > 0) return false;
       }
-      return inside;
+      return true;
     };
 
     // Persistent indicator dot clamped strictly inside or on the 3D cube boundary:

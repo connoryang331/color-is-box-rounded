@@ -787,17 +787,17 @@ export function createRoundedBoxPicker(
       const hull = computeConvexHull(allProjPts);
 
       const pointInPoly = (pt: Vec2, poly: Vec2[]): boolean => {
-        let inside = true;
+        if (!poly || poly.length < 3) return false;
+        let pos = 0, neg = 0;
         for (let i = 0; i < poly.length; i++) {
           const p1 = poly[i];
           const p2 = poly[(i + 1) % poly.length];
           const cross = (p2.x - p1.x) * (pt.y - p1.y) - (p2.y - p1.y) * (pt.x - p1.x);
-          if (cross < 0) {
-            inside = false;
-            break;
-          }
+          if (cross > 1e-6) pos++;
+          else if (cross < -1e-6) neg++;
+          if (pos > 0 && neg > 0) return false;
         }
-        return inside;
+        return true;
       };
 
       if (!pointInPoly(p, hull)) {
