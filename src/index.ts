@@ -188,7 +188,7 @@ export function createRoundedBoxPicker(
     }
     if (cubeSatAnimFrame !== null) return;
     let last = performance.now();
-    const speed = 10.0;
+    const speed = openSpeed || 10.0;
     const step = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
@@ -213,6 +213,12 @@ export function createRoundedBoxPicker(
   let cubeSatSize = guides.cubeSatSize || 165;
   let alphaRingRadius = guides.alphaRingRadius !== undefined ? guides.alphaRingRadius : 0.92;
   let alphaRingWidth = guides.alphaRingWidth !== undefined ? guides.alphaRingWidth : 16;
+  let cubeSatPitch = guides.cubeSatPitch !== undefined ? guides.cubeSatPitch : 19;
+  let cubeSatYaw = guides.cubeSatYaw !== undefined ? guides.cubeSatYaw : -33;
+  let temperatureRange = guides.temperatureRange !== undefined ? guides.temperatureRange : 35;
+  let indicatorKnobRadius = guides.indicatorKnobRadius !== undefined ? guides.indicatorKnobRadius : 9;
+  let checkerSize = guides.checkerSize !== undefined ? guides.checkerSize : 4;
+  let openSpeed = guides.openSpeed !== undefined ? guides.openSpeed : 10.0;
 
   let animId: number | null = null;
   const scheduleRender = () => {
@@ -222,7 +228,23 @@ export function createRoundedBoxPicker(
       renderRoundedBox(
         rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
         ringAnchor ? { anchor: ringAnchor, reveal: ringReveal, band: ringBand, colorAnchor: ringColorAnchor, angle: ringAngle } : null,
-        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: cubeSatSize, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos, currentColor: cubeSatCurrentColor, alphaRingRadius, alphaRingWidth } : null,
+        cubeSatAnchor ? {
+          anchor: cubeSatAnchor,
+          reveal: cubeSatReveal,
+          size: cubeSatSize,
+          colorAnchor: cubeSatColorAnchor || dotValues,
+          currentCoord: cubeSatCoord,
+          mapping: guides.cubeSatMapping,
+          pointerPos: cubeSatPointerPos,
+          currentColor: cubeSatCurrentColor,
+          alphaRingRadius,
+          alphaRingWidth,
+          pitchDeg: cubeSatPitch,
+          yawDeg: cubeSatYaw,
+          temperatureRange,
+          indicatorKnobRadius,
+          checkerSize,
+        } : null,
         alpha
       );
     });
@@ -601,7 +623,8 @@ export function createRoundedBoxPicker(
       // v in [0, 1]: Saturation (up = vibrant color, down = desaturated/dark)
       // w in [0, 1]: Brightness (0 = pure black shadow, 1 = maximum brightness / white)
       const hsb = rgbToHsb(baseRgb);
-      const hueShift = (u - 0.5) * 60;
+      const span = (temperatureRange !== undefined ? temperatureRange : 35) * 2;
+      const hueShift = (u - 0.5) * span;
       const targetH = (hsb.h + hueShift + 360) % 360;
       const targetS = Math.max(0, Math.min(100, v * 100));
       // Brightness directly scales with w * (0.3 + 0.7 * v) so w -> 0 reaches pure black 0
@@ -648,8 +671,8 @@ export function createRoundedBoxPicker(
       }
       // 3D Perspective Projection for Cube SAT (identical parameters to renderer):
       const s = cubeSatSize;
-      const radYaw = -33 * Math.PI / 180;
-      const radPitch = 19 * Math.PI / 180;
+      const radYaw = (cubeSatYaw !== undefined ? cubeSatYaw : -33) * Math.PI / 180;
+      const radPitch = (cubeSatPitch !== undefined ? cubeSatPitch : 19) * Math.PI / 180;
       const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
       const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
       const rAlpha = s * alphaRingRadius;
@@ -1060,6 +1083,40 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getAlphaRingWidth: () => alphaRingWidth,
+    setCubeSatOrientation: (pitchDeg: number, yawDeg: number) => {
+      cubeSatPitch = Math.max(-45, Math.min(45, pitchDeg));
+      cubeSatYaw = Math.max(-90, Math.min(90, yawDeg));
+      guides.cubeSatPitch = cubeSatPitch;
+      guides.cubeSatYaw = cubeSatYaw;
+      scheduleRender();
+    },
+    getCubeSatOrientation: () => ({
+      pitchDeg: cubeSatPitch !== undefined ? cubeSatPitch : 19,
+      yawDeg: cubeSatYaw !== undefined ? cubeSatYaw : -33,
+    }),
+    setTemperatureRange: (degrees: number) => {
+      temperatureRange = Math.max(10, Math.min(90, degrees));
+      guides.temperatureRange = temperatureRange;
+      scheduleRender();
+    },
+    getTemperatureRange: () => temperatureRange !== undefined ? temperatureRange : 35,
+    setIndicatorKnobRadius: (radiusPx: number) => {
+      indicatorKnobRadius = Math.max(5, Math.min(16, radiusPx));
+      guides.indicatorKnobRadius = indicatorKnobRadius;
+      scheduleRender();
+    },
+    getIndicatorKnobRadius: () => indicatorKnobRadius !== undefined ? indicatorKnobRadius : 9,
+    setCheckerSize: (sizePx: number) => {
+      checkerSize = Math.max(2, Math.min(12, sizePx));
+      guides.checkerSize = checkerSize;
+      scheduleRender();
+    },
+    getCheckerSize: () => checkerSize !== undefined ? checkerSize : 4,
+    setOpenSpeed: (speed: number) => {
+      openSpeed = Math.max(4.0, Math.min(24.0, speed));
+      guides.openSpeed = openSpeed;
+    },
+    getOpenSpeed: () => openSpeed !== undefined ? openSpeed : 10.0,
     setHoldDelay: (delayMs: number) => {
       guides.holdDelayMs = Math.max(0, Math.min(800, delayMs));
       scheduleRender();

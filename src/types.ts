@@ -99,6 +99,18 @@ export interface GuideVisibility {
   alphaRingRadius: number;
   /** Stroke thickness of the Alpha Orbital Ring in pixels (default 16px, range 8px ~ 32px) */
   alphaRingWidth: number;
+  /** 3D Cube SAT Isometric Pitch angle in degrees (default 19°, range -45° ~ 45°) */
+  cubeSatPitch: number;
+  /** 3D Cube SAT Isometric Yaw angle in degrees (default -33°, range -90° ~ 90°) */
+  cubeSatYaw: number;
+  /** Temperature shift range in degrees for Top face (default 35°, range 10° ~ 90°) */
+  temperatureRange: number;
+  /** Visual radius in pixels for indicator knobs and dots (default 9px, range 5px ~ 16px) */
+  indicatorKnobRadius: number;
+  /** Checkerboard square size in pixels for transparency background (default 4px, range 2px ~ 12px) */
+  checkerSize: number;
+  /** Smooth opening transition speed (default 10.0, range 4.0 ~ 24.0) */
+  openSpeed: number;
 }
 
 export const DEFAULT_GUIDES: GuideVisibility = {
@@ -117,6 +129,12 @@ export const DEFAULT_GUIDES: GuideVisibility = {
   holdDelayMs: 300,
   alphaRingRadius: 0.92,
   alphaRingWidth: 16,
+  cubeSatPitch: 19,
+  cubeSatYaw: -33,
+  temperatureRange: 35,
+  indicatorKnobRadius: 9,
+  checkerSize: 4,
+  openSpeed: 10.0,
 };
 
 export const AXIS_LABELS: Record<ColorMode, [string, string, string]> = {
@@ -148,6 +166,16 @@ export interface RoundedBoxColorPicker {
   getAlphaRingRadius(): number;
   setAlphaRingWidth(widthPx: number): void;
   getAlphaRingWidth(): number;
+  setCubeSatOrientation(pitchDeg: number, yawDeg: number): void;
+  getCubeSatOrientation(): { pitchDeg: number; yawDeg: number };
+  setTemperatureRange(degrees: number): void;
+  getTemperatureRange(): number;
+  setIndicatorKnobRadius(radiusPx: number): void;
+  getIndicatorKnobRadius(): number;
+  setCheckerSize(sizePx: number): void;
+  getCheckerSize(): number;
+  setOpenSpeed(speed: number): void;
+  getOpenSpeed(): number;
   setDotSensitivity(radiusPx: number): void;
   getDotSensitivity(): number;
   setHoldDelay(delayMs: number): void;

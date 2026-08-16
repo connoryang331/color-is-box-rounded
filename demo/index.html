@@ -552,6 +552,48 @@
             </div>
           </div>
           <div class="row" style="padding: 2px 0 2px 0;">
+            <span class="label" style="font-size: 11px;">CUBE PITCH</span>
+            <div class="blender-slider" id="slider-cube-pitch" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #eab308;"></div>
+              <input type="text" id="v-cube-pitch" value="19.0°" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
+          <div class="row" style="padding: 2px 0 2px 0;">
+            <span class="label" style="font-size: 11px;">CUBE YAW</span>
+            <div class="blender-slider" id="slider-cube-yaw" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #f97316;"></div>
+              <input type="text" id="v-cube-yaw" value="-33.0°" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
+          <div class="row" style="padding: 2px 0 2px 0;">
+            <span class="label" style="font-size: 11px;">TEMP RANGE</span>
+            <div class="blender-slider" id="slider-temp-range" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #ef4444;"></div>
+              <input type="text" id="v-temp-range" value="35.0°" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
+          <div class="row" style="padding: 2px 0 2px 0;">
+            <span class="label" style="font-size: 11px;">KNOB RADIUS</span>
+            <div class="blender-slider" id="slider-knob-r" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #6366f1;"></div>
+              <input type="text" id="v-knob-r" value="9px" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
+          <div class="row" style="padding: 2px 0 2px 0;">
+            <span class="label" style="font-size: 11px;">CHECKER SIZE</span>
+            <div class="blender-slider" id="slider-checker-sz" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #64748b;"></div>
+              <input type="text" id="v-checker-sz" value="4px" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
+          <div class="row" style="padding: 2px 0 2px 0;">
+            <span class="label" style="font-size: 11px;">OPEN SPEED</span>
+            <div class="blender-slider" id="slider-open-speed" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #14b8a6;"></div>
+              <input type="text" id="v-open-speed" value="10.0x" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
+          <div class="row" style="padding: 2px 0 2px 0;">
             <span class="label" style="font-size: 11px;">HOLD DELAY</span>
             <div class="blender-slider" id="slider-hold-delay" style="width: 115px; height: 22px;">
               <div class="bar" style="background: #3b82f6;"></div>
@@ -1019,6 +1061,12 @@
     const sDotSens = makeGenericSlider('slider-dot-sens', 'v-dot-sens', () => picker.getDotSensitivity ? picker.getDotSensitivity() : 36, (v) => { if (picker.setDotSensitivity) picker.setDotSensitivity(v); }, 10, 100, 'px', 0);
     const sAlphaR = makeGenericSlider('slider-alpha-r', 'v-alpha-r', () => picker.getAlphaRingRadius ? picker.getAlphaRingRadius() : 0.92, (v) => { if (picker.setAlphaRingRadius) picker.setAlphaRingRadius(v); }, 0.75, 1.30, 'x', 2);
     const sAlphaW = makeGenericSlider('slider-alpha-w', 'v-alpha-w', () => picker.getAlphaRingWidth ? picker.getAlphaRingWidth() : 16, (v) => { if (picker.setAlphaRingWidth) picker.setAlphaRingWidth(v); }, 8, 32, 'px', 0);
+    const sCubePitch = makeGenericSlider('slider-cube-pitch', 'v-cube-pitch', () => picker.getCubeSatOrientation ? picker.getCubeSatOrientation().pitchDeg : 19, (v) => { if (picker.setCubeSatOrientation) picker.setCubeSatOrientation(v, picker.getCubeSatOrientation().yawDeg); }, -45, 45, '°', 1);
+    const sCubeYaw = makeGenericSlider('slider-cube-yaw', 'v-cube-yaw', () => picker.getCubeSatOrientation ? picker.getCubeSatOrientation().yawDeg : -33, (v) => { if (picker.setCubeSatOrientation) picker.setCubeSatOrientation(picker.getCubeSatOrientation().pitchDeg, v); }, -90, 90, '°', 1);
+    const sTempRange = makeGenericSlider('slider-temp-range', 'v-temp-range', () => picker.getTemperatureRange ? picker.getTemperatureRange() : 35, (v) => { if (picker.setTemperatureRange) picker.setTemperatureRange(v); }, 10, 90, '°', 1);
+    const sKnobR = makeGenericSlider('slider-knob-r', 'v-knob-r', () => picker.getIndicatorKnobRadius ? picker.getIndicatorKnobRadius() : 9, (v) => { if (picker.setIndicatorKnobRadius) picker.setIndicatorKnobRadius(v); }, 5, 16, 'px', 0);
+    const sCheckerSz = makeGenericSlider('slider-checker-sz', 'v-checker-sz', () => picker.getCheckerSize ? picker.getCheckerSize() : 4, (v) => { if (picker.setCheckerSize) picker.setCheckerSize(v); }, 2, 12, 'px', 0);
+    const sOpenSpeed = makeGenericSlider('slider-open-speed', 'v-open-speed', () => picker.getOpenSpeed ? picker.getOpenSpeed() : 10.0, (v) => { if (picker.setOpenSpeed) picker.setOpenSpeed(v); }, 4.0, 24.0, 'x', 1);
     const sHoldDelay = makeGenericSlider('slider-hold-delay', 'v-hold-delay', () => picker.getHoldDelay ? picker.getHoldDelay() : 300, (v) => { if (picker.setHoldDelay) picker.setHoldDelay(v); }, 0, 600, 'ms', 0);
 
     const sSizeX = makeGenericSlider('slider-size-x', 'v-size-x', () => picker.getDimensions().sizeX, (v) => {

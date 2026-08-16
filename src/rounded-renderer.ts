@@ -26,6 +26,11 @@ export interface CubeSatState {
   currentColor?: RGBColor | null; // Live adjusted color from the Cube SAT
   alphaRingRadius?: number; // Multiplier relative to s (default 0.92)
   alphaRingWidth?: number;  // Stroke thickness in px (default 16)
+  pitchDeg?: number;        // Isometric Pitch in deg (default 19)
+  yawDeg?: number;          // Isometric Yaw in deg (default -33)
+  temperatureRange?: number;// Top face temp shift range (default 35)
+  indicatorKnobRadius?: number; // Knob and dot radius in px (default 9)
+  checkerSize?: number;     // Checkerboard square size in px (default 4)
 }
 
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
@@ -675,9 +680,11 @@ export function renderRoundedBox(
     ay = Math.max(safeMargin, Math.min(height - safeMargin, ay));
 
     // 3D Rotated Perspective for the Cube SAT matching 3d cube sat.png:
-    // Perfect regular cube [-1, 1]^3 rotated slightly to the left (Yaw = -33°, Pitch = 19°)
-    const radYaw = -33 * Math.PI / 180;
-    const radPitch = 19 * Math.PI / 180;
+    // Configurable pitch and yaw (default Yaw = -33°, Pitch = 19°)
+    const pitchVal = cubeSat.pitchDeg !== undefined ? cubeSat.pitchDeg : 19;
+    const yawVal = cubeSat.yawDeg !== undefined ? cubeSat.yawDeg : -33;
+    const radYaw = yawVal * Math.PI / 180;
+    const radPitch = pitchVal * Math.PI / 180;
     const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
     const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
 
@@ -706,9 +713,10 @@ export function renderRoundedBox(
     const B_front = proj3D( 1, -1,  1);
 
     // ── 1. Top Face: Temperature Gradient — strictly from front corner (T_front) upwards to top apex (T_back) ──
+    const tempRange = cubeSat.temperatureRange !== undefined ? cubeSat.temperatureRange : 35;
     const baseCol = valuesToRgb(cubeSat.colorAnchor, mode);
     const baseHsb = rgbToHsb(baseCol);
-    const warmCol = hsbToRgb({ h: (baseHsb.h + 35) % 360, s: baseHsb.s, b: baseHsb.b });
+    const warmCol = hsbToRgb({ h: (baseHsb.h + tempRange) % 360, s: baseHsb.s, b: baseHsb.b });
 
     // Direction: From bottom vertex of top face (T_front) straight UPWARDS to top vertex (T_back)
     const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
@@ -746,31 +754,32 @@ export function renderRoundedBox(
     overlayCtx.fillStyle = gradSat;
     overlayCtx.fill();
 
-    // Unified vertical bottom shading: strictly from front-top vertex (T_front) downwards to bottom-front (B_front)
-    const vertShade = overlayCtx.createLinearGradient(
-      T_front.x, T_front.y,
-      B_front.x, B_front.y
-    );
-    vertShade.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vertShade.addColorStop(0.4, 'rgba(50, 50, 50, 0.15)');
-    vertShade.addColorStop(1, 'rgba(70, 70, 70, 0.65)');
-    overlayCtx.fillStyle = vertShade;
+    // Vertical shading gradient from top (T_front) to bottom (B_front) to introduce lower shadow / neutral depth
+    const gradDepth = overlayCtx.createLinearGradient(T_front.x, T_front.y, B_front.x, B_front.y);
+    gradDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.18)');
+    gradDepth.addColorStop(1, 'rgba(30, 30, 30, 0.55)');
+
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(T_left.x, T_left.y);
+    overlayCtx.lineTo(T_front.x, T_front.y);
+    overlayCtx.lineTo(T_right.x, T_right.y);
+    overlayCtx.lineTo(B_right.x, B_right.y);
+    overlayCtx.lineTo(B_front.x, B_front.y);
+    overlayCtx.lineTo(B_left.x, B_left.y);
+    overlayCtx.closePath();
+    overlayCtx.fillStyle = gradDepth;
     overlayCtx.fill();
 
-    // ── Cube Wireframe Accents (outer perimeter + top edges only, no center dividing line) ──
+    // Outline for seamless faces
     overlayCtx.beginPath();
-    overlayCtx.moveTo(T_back.x, T_back.y);
+    overlayCtx.moveTo(T_left.x, T_left.y);
+    overlayCtx.lineTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
     overlayCtx.lineTo(B_right.x, B_right.y);
     overlayCtx.lineTo(B_front.x, B_front.y);
     overlayCtx.lineTo(B_left.x, B_left.y);
     overlayCtx.lineTo(T_left.x, T_left.y);
-    overlayCtx.closePath();
-    // Top edges of left/right faces meet at T_front — no vertical center line
-    overlayCtx.moveTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(T_left.x, T_left.y);
-    overlayCtx.moveTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(T_right.x, T_right.y);
     overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
     overlayCtx.lineWidth = 1.2;
     overlayCtx.stroke();
@@ -795,7 +804,7 @@ export function renderRoundedBox(
     overlayCtx.fill();
 
     // Draw checkerboard tiles inside the clipped ring
-    const checkStep = 4;
+    const checkStep = cubeSat.checkerSize || 4;
     const rr = rAlpha + wAlpha / 2;
     overlayCtx.fillStyle = '#cbd5e1';
     for (let gy = ay - rr; gy < ay + rr; gy += checkStep * 2) {
@@ -830,9 +839,10 @@ export function renderRoundedBox(
     overlayCtx.stroke();
 
     // Helper: Shared Unified Indicator Knob with white ring and contrast outline
+    const knobRadius = cubeSat.indicatorKnobRadius || 9;
     const drawIndicatorKnob = (x: number, y: number, rgb: RGBColor) => {
       overlayCtx.beginPath();
-      overlayCtx.arc(x, y, 9, 0, Math.PI * 2);
+      overlayCtx.arc(x, y, knobRadius, 0, Math.PI * 2);
       overlayCtx.fillStyle = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
       overlayCtx.fill();
       overlayCtx.lineWidth = 2.5;
