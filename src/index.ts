@@ -650,12 +650,22 @@ export function createRoundedBoxPicker(
         v = 1.0;            // full sat
         w = 1 - darkness;   // bri: 100% → 0% (pure black)
       } else {
-        // --- TOP FACE ---
-        const dxTop = (p.x - ax) / (s * 0.44);
-        const dyTop = (ay - p.y) / (s * 0.44);
-        u = Math.max(0, Math.min(1, 0.5 + dxTop * 0.7));
-        v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
-        w = 1.0;
+        // --- TOP FACE: Temperature (u) & Saturation (v) ---
+        // Project onto T_left -> T_right vector for cold <-> warm temperature:
+        const gxTop = T_right.x - T_left.x, gyTop = T_right.y - T_left.y;
+        const len2Top = gxTop * gxTop + gyTop * gyTop || 1;
+        const tempFraction = Math.max(0, Math.min(1,
+          ((p.x - T_left.x) * gxTop + (p.y - T_left.y) * gyTop) / len2Top));
+
+        // Depth axis (T_back -> T_front) for saturation:
+        const gzDepth = T_front.x - T_back.x, gyDepth = T_front.y - T_back.y;
+        const len2Depth = gzDepth * gzDepth + gyDepth * gyDepth || 1;
+        const depthFraction = Math.max(0, Math.min(1,
+          ((p.x - T_back.x) * gzDepth + (p.y - T_back.y) * gyDepth) / len2Depth));
+
+        u = tempFraction;                           // 0 = cold (-30°), 0.5 = base color, 1 = warm (+30°)
+        v = Math.max(0.2, Math.min(1, 0.4 + 0.6 * depthFraction)); // depth modifies saturation
+        w = 1.0;                                     // top face full brightness
       }
 
       cubeSatPointerPos = p;
