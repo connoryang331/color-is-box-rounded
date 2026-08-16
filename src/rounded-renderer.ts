@@ -661,39 +661,36 @@ export function renderRoundedBox(
     const ax = cubeSat.anchor.x;
     const ay = cubeSat.anchor.y;
 
-    // 3D Rotated Perspective for the Cube SAT (rotated slightly to the left, matching 3D preview & real isometric look)
-    // Yaw = -22°, Pitch = 26°
-    const radYaw = -22 * Math.PI / 180;
-    const radPitch = 26 * Math.PI / 180;
+    // 3D Rotated Perspective for the Cube SAT matching 3d cube sat.png:
+    // Perfect regular cube [-1, 1]^3 rotated slightly to the left (Yaw = -33°, Pitch = 19°)
+    const radYaw = -33 * Math.PI / 180;
+    const radPitch = 19 * Math.PI / 180;
     const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
     const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
 
     // 3D projection function from unit cube [-1, 1]^3 to screen (ax, ay)
     const proj3D = (px: number, py: number, pz: number): Vec2 => {
-      // 1. Rotate Yaw around Y
       const x1 = px * cy + pz * sy;
       const y1 = py;
       const z1 = -px * sy + pz * cy;
-      // 2. Rotate Pitch around X
       const x2 = x1;
       const y2 = y1 * cp - z1 * sp;
       return {
-        x: ax + x2 * s * 0.46,
-        y: ay - y2 * s * 0.46, // Invert Y for canvas
+        x: ax + x2 * s * 0.44,
+        y: ay - y2 * s * 0.44, // Invert Y for canvas
       };
     };
 
-    // 8 3D Vertices for Cube SAT:
-    // Top 4 vertices (Y = +1):
-    const T_top = proj3D(0, 1, -1);      // Back corner
-    const T_right = proj3D(1, 1, 0);     // Right corner
-    const T_bot = proj3D(0, 1, 1);       // Front corner
-    const T_left = proj3D(-1, 1, 0);     // Left corner
+    // 8 True 3D Vertices for a Regular Cube (X in [-1, 1], Y in [-1, 1], Z in [-1, 1]):
+    const T_back  = proj3D(-1,  1, -1);
+    const T_left  = proj3D(-1,  1,  1);
+    const T_right = proj3D( 1,  1, -1);
+    const T_front = proj3D( 1,  1,  1);
 
-    // Bottom 4 vertices (Y = -1):
-    const B_bot = proj3D(0, -1, 1);      // Front bottom corner
-    const B_left = proj3D(-1, -1, 0);    // Left bottom corner
-    const B_right = proj3D(1, -1, 0);    // Right bottom corner
+    const B_back  = proj3D(-1, -1, -1);
+    const B_left  = proj3D(-1, -1,  1);
+    const B_right = proj3D( 1, -1, -1);
+    const B_front = proj3D( 1, -1,  1);
 
     // Draw backdrop card (subtle dark glassmorphism card for contrast)
     overlayCtx.save();
@@ -721,9 +718,9 @@ export function renderRoundedBox(
     gradTop.addColorStop(1, '#ff6b6b');
 
     overlayCtx.beginPath();
-    overlayCtx.moveTo(T_top.x, T_top.y);
+    overlayCtx.moveTo(T_back.x, T_back.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
-    overlayCtx.lineTo(T_bot.x, T_bot.y);
+    overlayCtx.lineTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_left.x, T_left.y);
     overlayCtx.closePath();
     overlayCtx.fillStyle = gradTop;
@@ -739,8 +736,8 @@ export function renderRoundedBox(
 
     overlayCtx.beginPath();
     overlayCtx.moveTo(T_left.x, T_left.y);
-    overlayCtx.lineTo(T_bot.x, T_bot.y);
-    overlayCtx.lineTo(B_bot.x, B_bot.y);
+    overlayCtx.lineTo(T_front.x, T_front.y);
+    overlayCtx.lineTo(B_front.x, B_front.y);
     overlayCtx.lineTo(B_left.x, B_left.y);
     overlayCtx.closePath();
     overlayCtx.fillStyle = gradLeft;
@@ -750,15 +747,15 @@ export function renderRoundedBox(
     overlayCtx.stroke();
 
     // ── 3. Right Face (Saturation -> Bright/Light/White Shading) ──
-    const gradRight = overlayCtx.createLinearGradient(T_bot.x, T_bot.y, T_right.x, T_right.y);
+    const gradRight = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_right.x, T_right.y);
     gradRight.addColorStop(0, `rgb(${Math.min(255, baseCol.r + 20)}, ${Math.min(255, baseCol.g + 20)}, ${Math.min(255, baseCol.b + 20)})`);
     gradRight.addColorStop(1, '#ffffff');
 
     overlayCtx.beginPath();
-    overlayCtx.moveTo(T_bot.x, T_bot.y);
+    overlayCtx.moveTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
     overlayCtx.lineTo(B_right.x, B_right.y);
-    overlayCtx.lineTo(B_bot.x, B_bot.y);
+    overlayCtx.lineTo(B_front.x, B_front.y);
     overlayCtx.closePath();
     overlayCtx.fillStyle = gradRight;
     overlayCtx.fill();
@@ -768,18 +765,18 @@ export function renderRoundedBox(
 
     // ── Cube Wireframe Accents ──
     overlayCtx.beginPath();
-    overlayCtx.moveTo(T_top.x, T_top.y);
+    overlayCtx.moveTo(T_back.x, T_back.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
     overlayCtx.lineTo(B_right.x, B_right.y);
-    overlayCtx.lineTo(B_bot.x, B_bot.y);
+    overlayCtx.lineTo(B_front.x, B_front.y);
     overlayCtx.lineTo(B_left.x, B_left.y);
     overlayCtx.lineTo(T_left.x, T_left.y);
     overlayCtx.closePath();
-    overlayCtx.moveTo(T_bot.x, T_bot.y);
-    overlayCtx.lineTo(B_bot.x, B_bot.y);
-    overlayCtx.moveTo(T_bot.x, T_bot.y);
+    overlayCtx.moveTo(T_front.x, T_front.y);
+    overlayCtx.lineTo(B_front.x, B_front.y);
+    overlayCtx.moveTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_left.x, T_left.y);
-    overlayCtx.moveTo(T_bot.x, T_bot.y);
+    overlayCtx.moveTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
     overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     overlayCtx.lineWidth = 1.2;
