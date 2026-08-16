@@ -26,7 +26,7 @@ export interface CubeSatState {
   currentColor?: RGBColor | null; // Live adjusted color from the Cube SAT
   alphaRingRadius?: number; // Multiplier relative to s (default 0.92)
   alphaRingWidth?: number;  // Stroke thickness in px (default 16)
-  shape?: 'cube' | 'cuboid' | 'pyramid'; // 3D geometry shape (default 'cube')
+  shape?: 'cube' | 'cuboid' | 'pyramid' | 'pyramid_inverted' | 'cylinder'; // 3D geometry shape (default 'cube')
   pitchDeg?: number;        // Isometric Pitch in deg (default 19)
   yawDeg?: number;          // Isometric Yaw in deg (default -33)
   temperatureRange?: number;// Top face temp shift range (default 35)
@@ -690,6 +690,8 @@ export function renderRoundedBox(
     const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
     const shape = cubeSat.shape || 'cube';
     const isPyramid = shape === 'pyramid';
+    const isPyramidInv = shape === 'pyramid_inverted';
+    const isCylinder = shape === 'cylinder';
     const isCuboid = shape === 'cuboid';
 
     const scaleX = isCuboid ? 1.35 : 1.0;
@@ -711,7 +713,8 @@ export function renderRoundedBox(
     };
 
     // 8 True 3D Vertices for a Regular Cube (X in [-1, 1], Y in [-1, 1], Z in [-1, 1]):
-    const Apex   = proj3D( 0,  1.35,  0); // Pyramid Top Apex
+    const ApexTop    = proj3D( 0,  1.35,  0); // Pyramid Top Apex
+    const ApexBottom = proj3D( 0, -1.35,  0); // Inverted Pyramid Bottom Apex
     const T_back  = proj3D(-1,  1, -1);
     const T_left  = proj3D(-1,  1,  1);
     const T_right = proj3D( 1,  1, -1);
@@ -728,41 +731,38 @@ export function renderRoundedBox(
     const warmCol = hsbToRgb({ h: (baseHsb.h + tempRange) % 360, s: baseHsb.s, b: baseHsb.b });
 
     if (isPyramid) {
-      // ── PYRAMID RENDERING (Apex + Left Face + Right Face + Shadow Base) ──
-      // 1. Left Face: Pure Black to Base Color (Apex -> B_left -> B_front)
+      // ── 1. PYRAMID (正金字塔四棱锥: 顶部 Apex + 底部三面展开) ──
       const gradPyrL = overlayCtx.createLinearGradient(B_left.x, B_left.y, B_front.x, B_front.y);
       gradPyrL.addColorStop(0, '#000000');
       gradPyrL.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
 
       overlayCtx.beginPath();
-      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
       overlayCtx.lineTo(B_front.x, B_front.y);
       overlayCtx.lineTo(B_left.x, B_left.y);
       overlayCtx.closePath();
       overlayCtx.fillStyle = gradPyrL;
       overlayCtx.fill();
 
-      // 2. Right Face: Base Color to Pure White (Apex -> B_front -> B_right)
       const gradPyrR = overlayCtx.createLinearGradient(B_front.x, B_front.y, B_right.x, B_right.y);
       gradPyrR.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
       gradPyrR.addColorStop(1, '#ffffff');
 
       overlayCtx.beginPath();
-      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
       overlayCtx.lineTo(B_right.x, B_right.y);
       overlayCtx.lineTo(B_front.x, B_front.y);
       overlayCtx.closePath();
       overlayCtx.fillStyle = gradPyrR;
       overlayCtx.fill();
 
-      // 3. Vertical Shading from Apex (Temperature/Light) down to Bottom (Shade)
-      const gradPyrDepth = overlayCtx.createLinearGradient(Apex.x, Apex.y, B_front.x, B_front.y);
+      const gradPyrDepth = overlayCtx.createLinearGradient(ApexTop.x, ApexTop.y, B_front.x, B_front.y);
       gradPyrDepth.addColorStop(0, `rgba(${warmCol.r}, ${warmCol.g}, ${warmCol.b}, 0.6)`);
       gradPyrDepth.addColorStop(0.3, 'rgba(0, 0, 0, 0)');
       gradPyrDepth.addColorStop(1, 'rgba(20, 20, 20, 0.6)');
 
       overlayCtx.beginPath();
-      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
       overlayCtx.lineTo(B_right.x, B_right.y);
       overlayCtx.lineTo(B_front.x, B_front.y);
       overlayCtx.lineTo(B_left.x, B_left.y);
@@ -770,21 +770,20 @@ export function renderRoundedBox(
       overlayCtx.fillStyle = gradPyrDepth;
       overlayCtx.fill();
 
-      // Wireframe Outlines
       overlayCtx.beginPath();
-      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
       overlayCtx.lineTo(B_left.x, B_left.y);
       overlayCtx.lineTo(B_front.x, B_front.y);
       overlayCtx.lineTo(B_right.x, B_right.y);
-      overlayCtx.lineTo(Apex.x, Apex.y);
-      overlayCtx.moveTo(Apex.x, Apex.y);
+      overlayCtx.lineTo(ApexTop.x, ApexTop.y);
+      overlayCtx.moveTo(ApexTop.x, ApexTop.y);
       overlayCtx.lineTo(B_front.x, B_front.y);
       overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
       overlayCtx.lineWidth = 1.2;
       overlayCtx.stroke();
-    } else {
-      // ── CUBE & CUBOID RENDERING (Top Temperature Face + Seamless SAT Left/Right Faces) ──
-      // 1. Top Face: Temperature Gradient — strictly from front corner (T_front) upwards to top apex (T_back)
+    } else if (isPyramidInv) {
+      // ── 2. INVERTED PYRAMID (倒金字塔四棱锥: 顶部平顶基座 + 底部尖顶 Apex) ──
+      // Top Quad Base (Temperature Face): T_back -> T_right -> T_front -> T_left
       const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
       gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
       gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
@@ -801,7 +800,148 @@ export function renderRoundedBox(
       overlayCtx.lineWidth = 1;
       overlayCtx.stroke();
 
-      // 2 & 3. Unified Seamless SAT Faces (Continuous Black <-> Base Color <-> White, No center crease)
+      // Left Inverted Face: (T_left -> T_front -> ApexBottom)
+      const gradInvL = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_front.x, T_front.y);
+      gradInvL.addColorStop(0, '#000000');
+      gradInvL.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_left.x, T_left.y);
+      overlayCtx.lineTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradInvL;
+      overlayCtx.fill();
+
+      // Right Inverted Face: (T_front -> T_right -> ApexBottom)
+      const gradInvR = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_right.x, T_right.y);
+      gradInvR.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      gradInvR.addColorStop(1, '#ffffff');
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradInvR;
+      overlayCtx.fill();
+
+      // Vertical Shading down to bottom apex
+      const gradInvDepth = overlayCtx.createLinearGradient(T_front.x, T_front.y, ApexBottom.x, ApexBottom.y);
+      gradInvDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradInvDepth.addColorStop(1, 'rgba(20, 20, 20, 0.7)');
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_left.x, T_left.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradInvDepth;
+      overlayCtx.fill();
+
+      // Outlines
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_left.x, T_left.y);
+      overlayCtx.lineTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
+      overlayCtx.lineTo(T_left.x, T_left.y);
+      overlayCtx.moveTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(ApexBottom.x, ApexBottom.y);
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      overlayCtx.lineWidth = 1.2;
+      overlayCtx.stroke();
+    } else if (isCylinder) {
+      // ── 3. CYLINDER (3D 圆柱体: 顶部圆盘色温 + 弧形圆柱侧壁渐变) ──
+      const nSteps = 32;
+      const topPts: Vec2[] = [];
+      const botPts: Vec2[] = [];
+      for (let i = 0; i < nSteps; i++) {
+        const theta = (i / nSteps) * Math.PI * 2;
+        topPts.push(proj3D(Math.cos(theta),  1, Math.sin(theta)));
+        botPts.push(proj3D(Math.cos(theta), -1, Math.sin(theta)));
+      }
+
+      // Cylinder Side Body
+      // Leftmost and rightmost visual edge points:
+      const pLeftT = proj3D(-1,  1, 0), pLeftB = proj3D(-1, -1, 0);
+      const pRightT = proj3D( 1,  1, 0), pRightB = proj3D( 1, -1, 0);
+      const pFrontT = proj3D( 0,  1, 1), pFrontB = proj3D( 0, -1, 1);
+
+      const gradCyl = overlayCtx.createLinearGradient(pLeftT.x, pLeftT.y, pRightT.x, pRightT.y);
+      gradCyl.addColorStop(0, '#000000');
+      gradCyl.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      gradCyl.addColorStop(1, '#ffffff');
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(topPts[0].x, topPts[0].y);
+      for (let i = 1; i < nSteps; i++) overlayCtx.lineTo(topPts[i].x, topPts[i].y);
+      overlayCtx.lineTo(botPts[0].x, botPts[0].y);
+      for (let i = nSteps - 1; i >= 0; i--) overlayCtx.lineTo(botPts[i].x, botPts[i].y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradCyl;
+      overlayCtx.fill();
+
+      // Cylinder Side Shading (downwards)
+      const gradCylDepth = overlayCtx.createLinearGradient(pFrontT.x, pFrontT.y, pFrontB.x, pFrontB.y);
+      gradCylDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradCylDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.15)');
+      gradCylDepth.addColorStop(1, 'rgba(20, 20, 20, 0.6)');
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(topPts[0].x, topPts[0].y);
+      for (let i = 1; i < nSteps; i++) overlayCtx.lineTo(topPts[i].x, topPts[i].y);
+      overlayCtx.lineTo(botPts[0].x, botPts[0].y);
+      for (let i = nSteps - 1; i >= 0; i--) overlayCtx.lineTo(botPts[i].x, botPts[i].y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradCylDepth;
+      overlayCtx.fill();
+
+      // Cylinder Top Disc (Temperature Gradient)
+      const pBackT = proj3D(0, 1, -1);
+      const gradTopDisc = overlayCtx.createLinearGradient(pFrontT.x, pFrontT.y, pBackT.x, pBackT.y);
+      gradTopDisc.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      gradTopDisc.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(topPts[0].x, topPts[0].y);
+      for (let i = 1; i < nSteps; i++) overlayCtx.lineTo(topPts[i].x, topPts[i].y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradTopDisc;
+      overlayCtx.fill();
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      overlayCtx.lineWidth = 1.2;
+      overlayCtx.stroke();
+
+      // Cylinder Outer Silhouettes
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(pLeftT.x, pLeftT.y);
+      overlayCtx.lineTo(pLeftB.x, pLeftB.y);
+      overlayCtx.moveTo(pRightT.x, pRightT.y);
+      overlayCtx.lineTo(pRightB.x, pRightB.y);
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      overlayCtx.lineWidth = 1.2;
+      overlayCtx.stroke();
+    } else {
+      // ── 4. CUBE & CUBOID (正方体 / 长方体) ──
+      // 1. Top Face: Temperature Gradient
+      const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
+      gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+      gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(T_back.x, T_back.y);
+      overlayCtx.lineTo(T_right.x, T_right.y);
+      overlayCtx.lineTo(T_front.x, T_front.y);
+      overlayCtx.lineTo(T_left.x, T_left.y);
+      overlayCtx.closePath();
+      overlayCtx.fillStyle = gradTop;
+      overlayCtx.fill();
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      overlayCtx.lineWidth = 1;
+      overlayCtx.stroke();
+
+      // 2 & 3. Unified Seamless SAT Faces
       const gradSat = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
       gradSat.addColorStop(0, '#000000');                                         // Leftmost: Pure Black
       gradSat.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`); // Center: Pure Vibrant Base Color
@@ -818,7 +958,7 @@ export function renderRoundedBox(
       overlayCtx.fillStyle = gradSat;
       overlayCtx.fill();
 
-      // Vertical shading gradient from top (T_front) to bottom (B_front)
+      // Vertical shading gradient from top to bottom
       const gradDepth = overlayCtx.createLinearGradient(T_front.x, T_front.y, B_front.x, B_front.y);
       gradDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
       gradDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.18)');
@@ -845,7 +985,6 @@ export function renderRoundedBox(
       overlayCtx.lineTo(B_left.x, B_left.y);
       overlayCtx.lineTo(T_left.x, T_left.y);
       overlayCtx.closePath();
-      // Top edges of left/right faces meet at T_front — no vertical center line
       overlayCtx.moveTo(T_front.x, T_front.y);
       overlayCtx.lineTo(T_left.x, T_left.y);
       overlayCtx.moveTo(T_front.x, T_front.y);
@@ -934,9 +1073,19 @@ export function renderRoundedBox(
 
     // ── Current 3D Coordinate Pick Circle Dot ──
     // 2D Outer Hull of the visible Shape on screen:
-    const hull: Vec2[] = isPyramid
-      ? [Apex, B_right, B_front, B_left]
-      : [T_back, T_right, B_right, B_front, B_left, T_left];
+    let hull: Vec2[];
+    if (isPyramid) {
+      hull = [ApexTop, B_right, B_front, B_left];
+    } else if (isPyramidInv) {
+      hull = [T_back, T_right, ApexBottom, T_left];
+    } else if (isCylinder) {
+      const pLeftT = proj3D(-1, 1, 0), pRightT = proj3D(1, 1, 0);
+      const pRightB = proj3D(1, -1, 0), pLeftB = proj3D(-1, -1, 0);
+      const pBackT = proj3D(0, 1, -1), pFrontB = proj3D(0, -1, 1);
+      hull = [pBackT, pRightT, pRightB, pFrontB, pLeftB, pLeftT];
+    } else {
+      hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+    }
 
     // Helper: Closest point on line segment [p1, p2] to point p
     const closestOnSeg = (p: Vec2, p1: Vec2, p2: Vec2): Vec2 => {

@@ -74,7 +74,7 @@ export const DEFAULT_EDGE_CONFIG: EdgeStyleConfig = {
 
 export type SatMode = 'rings' | 'triangle' | 'cube_sat';
 export type CubeSatMapping = 'temp_sat_bri' | 'hsv' | 'oklch';
-export type SatShape = 'cube' | 'cuboid' | 'pyramid';
+export type SatShape = 'cube' | 'cuboid' | 'pyramid' | 'pyramid_inverted' | 'cylinder';
 
 export interface GuideVisibility {
   vertexX: boolean;
@@ -88,7 +88,7 @@ export interface GuideVisibility {
   svTriangle: boolean;
   /** Tuning mode when pressing the pick indicator: 'rings' | 'triangle' | 'cube_sat' */
   satMode: SatMode;
-  /** 3D Geometric Shape for the SAT popup: 'cube' (正方体) | 'cuboid' (长方体) | 'pyramid' (金字塔四棱锥) */
+  /** 3D Geometric Shape for the SAT popup: 'cube' | 'cuboid' | 'pyramid' | 'pyramid_inverted' | 'cylinder' */
   satShape: SatShape;
   /** Coordinate mapping rule for 3D Cube SAT */
   cubeSatMapping: CubeSatMapping;

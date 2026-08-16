@@ -684,6 +684,8 @@ export function createRoundedBoxPicker(
       const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
 
       const isPyramid = satShape === 'pyramid';
+      const isPyramidInv = satShape === 'pyramid_inverted';
+      const isCylinder = satShape === 'cylinder';
       const isCuboid = satShape === 'cuboid';
       const scaleX = isCuboid ? 1.35 : 1.0;
       const scaleY = isCuboid ? 0.72 : 1.0;
@@ -702,7 +704,8 @@ export function createRoundedBoxPicker(
         };
       };
 
-      const Apex   = proj( 0,  1.35,  0);
+      const ApexTop    = proj( 0,  1.35,  0);
+      const ApexBottom = proj( 0, -1.35,  0);
       const T_back  = proj(-1,  1, -1);
       const T_left  = proj(-1,  1,  1);
       const T_right = proj( 1,  1, -1);
@@ -737,9 +740,20 @@ export function createRoundedBoxPicker(
       }
 
       // Check whether pointer is strictly inside the 3D geometry hull
-      const hull: Vec2[] = isPyramid
-        ? [Apex, B_right, B_front, B_left]
-        : [T_back, T_right, B_right, B_front, B_left, T_left];
+      let hull: Vec2[];
+      if (isPyramid) {
+        hull = [ApexTop, B_right, B_front, B_left];
+      } else if (isPyramidInv) {
+        hull = [T_back, T_right, ApexBottom, T_left];
+      } else if (isCylinder) {
+        const pLeftT = proj(-1, 1, 0), pRightT = proj(1, 1, 0);
+        const pRightB = proj(1, -1, 0), pLeftB = proj(-1, -1, 0);
+        const pBackT = proj(0, 1, -1), pFrontB = proj(0, -1, 1);
+        hull = [pBackT, pRightT, pRightB, pFrontB, pLeftB, pLeftT];
+      } else {
+        hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+      }
+      
       const pointInPoly = (pt: Vec2, poly: Vec2[]): boolean => {
         let inside = true;
         for (let i = 0; i < poly.length; i++) {
@@ -762,11 +776,11 @@ export function createRoundedBoxPicker(
 
       if (isPyramid) {
         // Pyramid Left Face: Apex -> B_left -> B_front
-        const pyrLeft = bary(p, Apex, B_front, B_left);
+        const pyrLeft = bary(p, ApexTop, B_front, B_left);
         // Pyramid Right Face: Apex -> B_front -> B_right
-        const pyrRight = bary(p, Apex, B_right, B_front);
+        const pyrRight = bary(p, ApexTop, B_right, B_front);
 
-        const vertDown = Math.max(0, Math.min(1, (p.y - Apex.y) / (B_front.y - Apex.y || 1)));
+        const vertDown = Math.max(0, Math.min(1, (p.y - ApexTop.y) / (B_front.y - ApexTop.y || 1)));
 
         if (pyrRight.inside) {
           const whiteness = Math.max(0, Math.min(1, (p.x - B_front.x) / (B_right.x - B_front.x || 1)));
@@ -778,6 +792,57 @@ export function createRoundedBoxPicker(
           u = 0.5;
           v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
           w = Math.max(0, Math.min(1, (1 - blackness) * (1 - vertDown * 0.55)));
+        }
+      } else if (isPyramidInv) {
+        const topT1 = bary(p, T_back, T_right, T_front);
+        const topT2 = bary(p, T_back, T_front, T_left);
+        if (topT1.inside || topT2.inside) {
+          const gx = T_back.x - T_front.x, gy = T_back.y - T_front.y;
+          const gLen2 = gx * gx + gy * gy || 1;
+          const t = Math.max(0, Math.min(1, ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+          u = 0.5 + t * 0.5;
+          v = 1.0;
+          w = 1.0;
+        } else {
+          const pyrInvLeft = bary(p, T_left, T_front, ApexBottom);
+          const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (ApexBottom.y - T_front.y || 1)));
+          if (pyrInvLeft.inside) {
+            const blackness = Math.max(0, Math.min(1, (T_front.x - p.x) / (T_front.x - T_left.x || 1)));
+            u = 0.5;
+            v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
+            w = Math.max(0, Math.min(1, (1 - blackness) * (1 - vertDown * 0.55)));
+          } else {
+            const whiteness = Math.max(0, Math.min(1, (p.x - T_front.x) / (T_right.x - T_front.x || 1)));
+            u = 0.5;
+            v = Math.max(0, Math.min(1, 1 - whiteness * 0.85));
+            w = Math.max(0.1, Math.min(1, (1 - vertDown * 0.55) * (0.6 + 0.4 * whiteness)));
+          }
+        }
+      } else if (isCylinder) {
+        const pFrontT = proj(0, 1, 1), pBackT = proj(0, 1, -1);
+        const pLeftT = proj(-1, 1, 0), pRightT = proj(1, 1, 0);
+        const pFrontB = proj(0, -1, 1);
+
+        if (p.y < pFrontT.y) {
+          const gx = pBackT.x - pFrontT.x, gy = pBackT.y - pFrontT.y;
+          const gLen2 = gx * gx + gy * gy || 1;
+          const t = Math.max(0, Math.min(1, ((p.x - pFrontT.x) * gx + (p.y - pFrontT.y) * gy) / gLen2));
+          u = 0.5 + t * 0.5;
+          v = 1.0;
+          w = 1.0;
+        } else {
+          const vertDown = Math.max(0, Math.min(1, (p.y - pFrontT.y) / (pFrontB.y - pFrontT.y || 1)));
+          if (p.x < pFrontT.x) {
+            const blackness = Math.max(0, Math.min(1, (pFrontT.x - p.x) / (pFrontT.x - pLeftT.x || 1)));
+            u = 0.5;
+            v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
+            w = Math.max(0, Math.min(1, (1 - blackness) * (1 - vertDown * 0.55)));
+          } else {
+            const whiteness = Math.max(0, Math.min(1, (p.x - pFrontT.x) / (pRightT.x - pFrontT.x || 1)));
+            u = 0.5;
+            v = Math.max(0, Math.min(1, 1 - whiteness * 0.85));
+            w = Math.max(0.1, Math.min(1, (1 - vertDown * 0.55) * (0.6 + 0.4 * whiteness)));
+          }
         }
       } else {
         // 1. Check Top Face Quad: Tri1(T_back, T_right, T_front) + Tri2(T_back, T_front, T_left)
