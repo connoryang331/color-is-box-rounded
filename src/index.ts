@@ -648,11 +648,13 @@ export function createRoundedBoxPicker(
       const arcStart = Math.PI * 0.72;
       const arcSpan = Math.PI * 0.56;
 
-      if (p.y >= ay + s * 0.38 && distFromCenter >= s * 0.65) {
-        // Pointer is on / near the bottom smile arc: calculate fraction from arcStart (left: 0%) to arcStart + arcSpan (right: 100%)
+      // Only activate when pointer is STRICTLY on the smile arc band itself (rAlpha ± (wAlpha/2 + 6px))
+      const isOnSmileBand = Math.abs(distFromCenter - rAlpha) <= (wAlpha / 2 + 6);
+
+      if (p.y >= ay + s * 0.45 && isOnSmileBand) {
+        // Pointer is directly on the bottom smile arc: calculate fraction from arcStart (left: 0%) to arcStart + arcSpan (right: 100%)
         let ang = Math.atan2(p.y - ay, p.x - ax);
         if (ang < 0) ang += Math.PI * 2;
-        // Normalize against arcStart
         let offset = ang - arcStart;
         if (offset < 0) offset += Math.PI * 2;
         const newAlpha = Math.max(0, Math.min(1, offset / arcSpan));
