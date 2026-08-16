@@ -604,10 +604,11 @@ export function createRoundedBoxPicker(
       const radPitch = 19 * Math.PI / 180;
       const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
       const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
-      const marginX = s * 0.44 * 1.5;
-      const marginY = s * 0.44 * 1.5;
-      const ax = Math.max(marginX, Math.min(rc.width - marginX, cubeSatAnchor.x));
-      const ay = Math.max(marginY, Math.min(rc.height - marginY, cubeSatAnchor.y));
+      const rAlpha = s * 0.88;
+      const wAlpha = 18;
+      const safeMargin = rAlpha + wAlpha / 2 + 10;
+      const ax = Math.max(safeMargin, Math.min(rc.width - safeMargin, cubeSatAnchor.x));
+      const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
 
       const proj = (px: number, py: number, pz: number): Vec2 => {
         const x1 = px * cy + pz * sy;
@@ -642,17 +643,15 @@ export function createRoundedBoxPicker(
 
       // Distance from center (ax, ay) to check whether pointer is dragging the Alpha Orbital Ring
       const distFromCenter = Math.hypot(p.x - ax, p.y - ay);
-      const rAlpha = s * 0.70;
 
-      if (distFromCenter >= s * 0.58) {
+      if (distFromCenter >= s * 0.68) {
         // Pointer is on / near the outer Alpha Orbital Ring: calculate angle and update alpha
-        // Angle starts at 12 o'clock (-PI/2) and goes clockwise 0..2PI
+        // (Do NOT update cubeSatPointerPos so the cube indicator dot stays locked in place)
         let ang = Math.atan2(p.y - ay, p.x - ax) + Math.PI / 2;
         if (ang < 0) ang += Math.PI * 2;
         const newAlpha = Math.max(0, Math.min(1, ang / (Math.PI * 2)));
         setAlphaInternal(newAlpha);
         notify();
-        cubeSatPointerPos = p;
         return;
       }
 

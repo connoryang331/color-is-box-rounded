@@ -659,14 +659,14 @@ export function renderRoundedBox(
 
     const baseSize = cubeSat.size || 140;
     const s = baseSize * (0.65 + 0.35 * progress);
-    let ax = cubeSat.anchor.x;
-    let ay = cubeSat.anchor.y;
+    // Outer boundary margin to ensure neither the 3D cube nor the Alpha Orbital Ring get clipped:
+    const rAlpha = s * 0.88;
+    const wAlpha = 18;
+    const alphaStart = -Math.PI / 2; // 12 o'clock
 
-    // Safety margin to prevent the 3D cube from being clipped by canvas edges:
-    const marginX = s * 0.44 * 1.5;
-    const marginY = s * 0.44 * 1.5;
-    ax = Math.max(marginX, Math.min(width - marginX, ax));
-    ay = Math.max(marginY, Math.min(height - marginY, ay));
+    const safeMargin = rAlpha + wAlpha / 2 + 10;
+    ax = Math.max(safeMargin, Math.min(width - safeMargin, ax));
+    ay = Math.max(safeMargin, Math.min(height - safeMargin, ay));
 
     // 3D Rotated Perspective for the Cube SAT matching 3d cube sat.png:
     // Perfect regular cube [-1, 1]^3 rotated slightly to the left (Yaw = -33°, Pitch = 19°)
@@ -770,10 +770,6 @@ export function renderRoundedBox(
     overlayCtx.stroke();
 
     // ── 4. Alpha Orbital Ring surrounding the 3D Cube SAT ──
-    const rAlpha = s * 0.72;
-    const wAlpha = 14;
-    const alphaStart = -Math.PI / 2; // 12 o'clock
-
     const curRgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
@@ -818,21 +814,20 @@ export function renderRoundedBox(
       const kx = ax + rAlpha * Math.cos(alphaEnd);
       const ky = ay + rAlpha * Math.sin(alphaEnd);
       overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 8, 0, Math.PI * 2);
+      overlayCtx.arc(kx, ky, 9, 0, Math.PI * 2);
       overlayCtx.fillStyle = '#ffffff';
       overlayCtx.fill();
       overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.7)';
       overlayCtx.lineWidth = 1.5;
       overlayCtx.stroke();
       overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 3.5, 0, Math.PI * 2);
+      overlayCtx.arc(kx, ky, 4, 0, Math.PI * 2);
       overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
       overlayCtx.fill();
     }
     overlayCtx.restore();
 
     // ── Current 3D Coordinate Pick Circle Dot ──
-
     // 2D Outer Hull of the visible Cube on screen:
     // Vertices in clockwise order: T_back -> T_right -> B_right -> B_front -> B_left -> T_left
     const hull: Vec2[] = [T_back, T_right, B_right, B_front, B_left, T_left];
@@ -862,8 +857,9 @@ export function renderRoundedBox(
       return inside;
     };
 
-    let dotX = ax;
-    let dotY = ay;
+    // Default indicator dot rests at the 3D center / front ridge intersection
+    let dotX = T_front.x;
+    let dotY = T_front.y;
 
     if (cubeSat.pointerPos) {
       const mouse = cubeSat.pointerPos;
@@ -871,20 +867,6 @@ export function renderRoundedBox(
         // Pointer is inside the 3D cube: dot follows mouse directly (1:1 with zero jump)
         dotX = mouse.x;
         dotY = mouse.y;
-      } else {
-        // Pointer is outside: clamp dot to closest point on cube perimeter
-        let minD = Infinity;
-        let bestPt: Vec2 = { x: ax, y: ay };
-        for (let i = 0; i < hull.length; i++) {
-          const pt = closestOnSeg(mouse, hull[i], hull[(i + 1) % hull.length]);
-          const d = (pt.x - mouse.x) ** 2 + (pt.y - mouse.y) ** 2;
-          if (d < minD) {
-            minD = d;
-            bestPt = pt;
-          }
-        }
-        dotX = bestPt.x;
-        dotY = bestPt.y;
       }
     }
 
