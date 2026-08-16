@@ -767,9 +767,9 @@ export function renderRoundedBox(
 
     if (isPyramid) {
       // ── PYRAMID: Apex (0, 1.35, 0) + Base Quad [-1, 1]x[-1, 1] at Y = -1 ──
-      // 1. Front (+Z): Apex -> (1, -1, 1) -> (-1, -1, 1)
-      addPolygonFace([[0, 1.35, 0], [1, -1, 1], [-1, -1, 1]], 'pyr_front', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+      // 1. Front (+Z): Apex -> (-1, -1, 1) -> (1, -1, 1)
+      addPolygonFace([[0, 1.35, 0], [-1, -1, 1], [1, -1, 1]], 'pyr_front', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
         grad.addColorStop(0, '#000000');
         grad.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
         grad.addColorStop(1, '#ffffff');
@@ -785,9 +785,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // 2. Right (+X): Apex -> (1, -1, -1) -> (1, -1, 1)
-      addPolygonFace([[0, 1.35, 0], [1, -1, -1], [1, -1, 1]], 'pyr_right', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+      // 2. Right (+X): Apex -> (1, -1, 1) -> (1, -1, -1)
+      addPolygonFace([[0, 1.35, 0], [1, -1, 1], [1, -1, -1]], 'pyr_right', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
         grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
         grad.addColorStop(1, '#ffffff');
         overlayCtx.beginPath();
@@ -802,9 +802,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // 3. Left (-X): Apex -> (-1, -1, 1) -> (-1, -1, -1)
-      addPolygonFace([[0, 1.35, 0], [-1, -1, 1], [-1, -1, -1]], 'pyr_left', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+      // 3. Left (-X): Apex -> (-1, -1, -1) -> (-1, -1, 1)
+      addPolygonFace([[0, 1.35, 0], [-1, -1, -1], [-1, -1, 1]], 'pyr_left', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
         grad.addColorStop(0, '#000000');
         grad.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
         overlayCtx.beginPath();
@@ -819,9 +819,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // 4. Back (-Z): Apex -> (-1, -1, -1) -> (1, -1, -1)
-      addPolygonFace([[0, 1.35, 0], [-1, -1, -1], [1, -1, -1]], 'pyr_back', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+      // 4. Back (-Z): Apex -> (1, -1, -1) -> (-1, -1, -1)
+      addPolygonFace([[0, 1.35, 0], [1, -1, -1], [-1, -1, -1]], 'pyr_back', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
         grad.addColorStop(0, '#000000');
         grad.addColorStop(1, '#ffffff');
         overlayCtx.beginPath();
@@ -866,9 +866,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // 2. Front Face (+Z): (0, -1.35, 0) -> (-1, 1, 1) -> (1, 1, 1)
-      addPolygonFace([[0, -1.35, 0], [-1, 1, 1], [1, 1, 1]], 'inv_front', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+      // 2. Front Face (+Z): (0, -1.35, 0) -> (1, 1, 1) -> (-1, 1, 1)
+      addPolygonFace([[0, -1.35, 0], [1, 1, 1], [-1, 1, 1]], 'inv_front', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
         grad.addColorStop(0, '#000000');
         grad.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
         grad.addColorStop(1, '#ffffff');
@@ -884,9 +884,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // 3. Right Face (+X): (0, -1.35, 0) -> (1, 1, 1) -> (1, 1, -1)
-      addPolygonFace([[0, -1.35, 0], [1, 1, 1], [1, 1, -1]], 'inv_right', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+      // 3. Right Face (+X): (0, -1.35, 0) -> (1, 1, -1) -> (1, 1, 1)
+      addPolygonFace([[0, -1.35, 0], [1, 1, -1], [1, 1, 1]], 'inv_right', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
         grad.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
         grad.addColorStop(1, '#ffffff');
         overlayCtx.beginPath();
@@ -901,9 +901,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // 4. Left Face (-X): (0, -1.35, 0) -> (-1, 1, -1) -> (-1, 1, 1)
-      addPolygonFace([[0, -1.35, 0], [-1, 1, -1], [-1, 1, 1]], 'inv_left', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+      // 4. Left Face (-X): (0, -1.35, 0) -> (-1, 1, 1) -> (-1, 1, -1)
+      addPolygonFace([[0, -1.35, 0], [-1, 1, 1], [-1, 1, -1]], 'inv_left', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
         grad.addColorStop(0, '#000000');
         grad.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
         overlayCtx.beginPath();
@@ -918,9 +918,9 @@ export function renderRoundedBox(
         overlayCtx.stroke();
       });
 
-      // 5. Back Face (-Z): (0, -1.35, 0) -> (1, 1, -1) -> (-1, 1, -1)
-      addPolygonFace([[0, -1.35, 0], [1, 1, -1], [-1, 1, -1]], 'inv_back', (pts) => {
-        const grad = overlayCtx.createLinearGradient(pts[2].x, pts[2].y, pts[1].x, pts[1].y);
+      // 5. Back Face (-Z): (0, -1.35, 0) -> (-1, 1, -1) -> (1, 1, -1)
+      addPolygonFace([[0, -1.35, 0], [-1, 1, -1], [1, 1, -1]], 'inv_back', (pts) => {
+        const grad = overlayCtx.createLinearGradient(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
         grad.addColorStop(0, '#000000');
         grad.addColorStop(1, '#ffffff');
         overlayCtx.beginPath();
