@@ -852,54 +852,103 @@ export function renderRoundedBox(
       overlayCtx.lineWidth = 1.2;
       overlayCtx.stroke();
     } else if (isCylinder) {
-      // ── 3. CYLINDER (3D 圆柱体: 顶部圆盘色温 + 弧形圆柱侧壁渐变) ──
-      const nSteps = 32;
+      // ── 3. CYLINDER (3D 圆柱体: 顶部真实透视圆盘 + 正确前后半周侧壁) ──
+      const nSteps = 48;
       const topPts: Vec2[] = [];
       const botPts: Vec2[] = [];
+
+      // Generate points around unit cylinder circle (X = cos, Z = sin)
       for (let i = 0; i < nSteps; i++) {
         const theta = (i / nSteps) * Math.PI * 2;
         topPts.push(proj3D(Math.cos(theta),  1, Math.sin(theta)));
         botPts.push(proj3D(Math.cos(theta), -1, Math.sin(theta)));
       }
 
-      // Cylinder Side Body
-      // Leftmost and rightmost visual edge points:
-      const pLeftT = proj3D(-1,  1, 0), pLeftB = proj3D(-1, -1, 0);
-      const pRightT = proj3D( 1,  1, 0), pRightB = proj3D( 1, -1, 0);
-      const pFrontT = proj3D( 0,  1, 1), pFrontB = proj3D( 0, -1, 1);
+      // Find extreme left and right silhouette tangent indices in screen space:
+      let minIdx = 0, maxIdx = 0;
+      for (let i = 1; i < nSteps; i++) {
+        if (topPts[i].x < topPts[minIdx].x) minIdx = i;
+        if (topPts[i].x > topPts[maxIdx].x) maxIdx = i;
+      }
 
+      // Build Front Half-Arc from minIdx (left) to maxIdx (right) facing camera (larger Y on screen)
+      const frontTopArc: Vec2[] = [];
+      const frontBotArc: Vec2[] = [];
+      let cur = minIdx;
+      while (true) {
+        frontTopArc.push(topPts[cur]);
+        frontBotArc.push(botPts[cur]);
+        if (cur === maxIdx) break;
+        cur = (cur + 1) % nSteps;
+      }
+      // If the chosen arc is on the back (smaller screen Y), take the other way:
+      const midPoint = frontTopArc[Math.floor(frontTopArc.length / 2)];
+      const oppIdx = (minIdx + Math.floor(nSteps / 2)) % nSteps;
+      if (midPoint.y < topPts[oppIdx].y) {
+        frontTopArc.length = 0;
+        frontBotArc.length = 0;
+        let c2 = maxIdx;
+        while (true) {
+          frontTopArc.push(topPts[c2]);
+          frontBotArc.push(botPts[c2]);
+          if (c2 === minIdx) break;
+          c2 = (c2 + 1) % nSteps;
+        }
+      }
+
+      const pLeftT = topPts[minIdx], pLeftB = botPts[minIdx];
+      const pRightT = topPts[maxIdx], pRightB = botPts[maxIdx];
+
+      // 1. Cylinder Front Side Mesh
       const gradCyl = overlayCtx.createLinearGradient(pLeftT.x, pLeftT.y, pRightT.x, pRightT.y);
       gradCyl.addColorStop(0, '#000000');
       gradCyl.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
       gradCyl.addColorStop(1, '#ffffff');
 
       overlayCtx.beginPath();
-      overlayCtx.moveTo(topPts[0].x, topPts[0].y);
-      for (let i = 1; i < nSteps; i++) overlayCtx.lineTo(topPts[i].x, topPts[i].y);
-      overlayCtx.lineTo(botPts[0].x, botPts[0].y);
-      for (let i = nSteps - 1; i >= 0; i--) overlayCtx.lineTo(botPts[i].x, botPts[i].y);
+      overlayCtx.moveTo(frontTopArc[0].x, frontTopArc[0].y);
+      for (let i = 1; i < frontTopArc.length; i++) overlayCtx.lineTo(frontTopArc[i].x, frontTopArc[i].y);
+      for (let i = frontBotArc.length - 1; i >= 0; i--) overlayCtx.lineTo(frontBotArc[i].x, frontBotArc[i].y);
       overlayCtx.closePath();
       overlayCtx.fillStyle = gradCyl;
       overlayCtx.fill();
 
-      // Cylinder Side Shading (downwards)
-      const gradCylDepth = overlayCtx.createLinearGradient(pFrontT.x, pFrontT.y, pFrontB.x, pFrontB.y);
+      // 2. Cylinder Side Vertical Shading (Top -> Bottom)
+      const gradCylDepth = overlayCtx.createLinearGradient(
+        (pLeftT.x + pRightT.x) / 2, (pLeftT.y + pRightT.y) / 2,
+        (pLeftB.x + pRightB.x) / 2, (pLeftB.y + pRightB.y) / 2
+      );
       gradCylDepth.addColorStop(0, 'rgba(0, 0, 0, 0)');
       gradCylDepth.addColorStop(0.5, 'rgba(128, 128, 128, 0.15)');
-      gradCylDepth.addColorStop(1, 'rgba(20, 20, 20, 0.6)');
+      gradCylDepth.addColorStop(1, 'rgba(20, 20, 20, 0.65)');
 
       overlayCtx.beginPath();
-      overlayCtx.moveTo(topPts[0].x, topPts[0].y);
-      for (let i = 1; i < nSteps; i++) overlayCtx.lineTo(topPts[i].x, topPts[i].y);
-      overlayCtx.lineTo(botPts[0].x, botPts[0].y);
-      for (let i = nSteps - 1; i >= 0; i--) overlayCtx.lineTo(botPts[i].x, botPts[i].y);
+      overlayCtx.moveTo(frontTopArc[0].x, frontTopArc[0].y);
+      for (let i = 1; i < frontTopArc.length; i++) overlayCtx.lineTo(frontTopArc[i].x, frontTopArc[i].y);
+      for (let i = frontBotArc.length - 1; i >= 0; i--) overlayCtx.lineTo(frontBotArc[i].x, frontBotArc[i].y);
       overlayCtx.closePath();
       overlayCtx.fillStyle = gradCylDepth;
       overlayCtx.fill();
 
-      // Cylinder Top Disc (Temperature Gradient)
-      const pBackT = proj3D(0, 1, -1);
-      const gradTopDisc = overlayCtx.createLinearGradient(pFrontT.x, pFrontT.y, pBackT.x, pBackT.y);
+      // Bottom Front Outline Curve
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(frontBotArc[0].x, frontBotArc[0].y);
+      for (let i = 1; i < frontBotArc.length; i++) overlayCtx.lineTo(frontBotArc[i].x, frontBotArc[i].y);
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      overlayCtx.lineWidth = 1.2;
+      overlayCtx.stroke();
+
+      // 3. Cylinder Top Disc (Temperature Gradient - Front to Back)
+      // Find front-most (max Y) and back-most (min Y) in topPts
+      let topFrontIdx = 0, topBackIdx = 0;
+      for (let i = 1; i < nSteps; i++) {
+        if (topPts[i].y > topPts[topFrontIdx].y) topFrontIdx = i;
+        if (topPts[i].y < topPts[topBackIdx].y) topBackIdx = i;
+      }
+      const pFrontTop = topPts[topFrontIdx];
+      const pBackTop = topPts[topBackIdx];
+
+      const gradTopDisc = overlayCtx.createLinearGradient(pFrontTop.x, pFrontTop.y, pBackTop.x, pBackTop.y);
       gradTopDisc.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
       gradTopDisc.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
 
@@ -909,17 +958,17 @@ export function renderRoundedBox(
       overlayCtx.closePath();
       overlayCtx.fillStyle = gradTopDisc;
       overlayCtx.fill();
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
       overlayCtx.lineWidth = 1.2;
       overlayCtx.stroke();
 
-      // Cylinder Outer Silhouettes
+      // Side Silhouette Edge Lines (Left & Right vertical seam borders)
       overlayCtx.beginPath();
       overlayCtx.moveTo(pLeftT.x, pLeftT.y);
       overlayCtx.lineTo(pLeftB.x, pLeftB.y);
       overlayCtx.moveTo(pRightT.x, pRightT.y);
       overlayCtx.lineTo(pRightB.x, pRightB.y);
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
       overlayCtx.lineWidth = 1.2;
       overlayCtx.stroke();
     } else {
