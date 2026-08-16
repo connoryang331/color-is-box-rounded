@@ -660,9 +660,8 @@ export function renderRoundedBox(
     const baseSize = cubeSat.size || 140;
     const s = baseSize * (0.65 + 0.35 * progress);
     // Outer boundary margin to ensure neither the 3D cube nor the Alpha Orbital Ring get clipped:
-    const rAlpha = s * 0.88;
-    const wAlpha = 18;
-    const alphaStart = -Math.PI / 2; // 12 o'clock
+    const rAlpha = s * 0.86;
+    const wAlpha = 22;
 
     let ax = cubeSat.anchor.x;
     let ay = cubeSat.anchor.y;
@@ -771,62 +770,106 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1.2;
     overlayCtx.stroke();
 
-    // ── 4. Alpha Orbital Ring surrounding the 3D Cube SAT ──
-    const curRgb = valuesToRgb(dotValues, mode);
-    const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
+    // ── 4. Alpha Smile Arc Slider at Bottom (Matches alpha ring.png reference) ──
+    const arcStart = Math.PI * 0.72; // ~130° (Left side of smile arc)
+    const arcEnd = Math.PI * 0.28;   // ~50° (Right side of smile arc, wrapping through bottom PI/2)
+    const arcSpan = Math.PI * 0.56;  // Total arc length
 
     overlayCtx.save();
-    // 1. Semi-transparent track ring background
-    overlayCtx.beginPath();
-    overlayCtx.arc(ax, ay, rAlpha, 0, Math.PI * 2);
+
+    // Helper to trace the smile arc with rounded caps
+    const traceSmileArc = (ctx: CanvasRenderingContext2D) => {
+      ctx.beginPath();
+      ctx.arc(ax, ay, rAlpha, arcStart, arcStart + arcSpan, false);
+    };
+
+    // 1. Clip to the smile arc area for the internal checkerboard background
+    overlayCtx.save();
+    traceSmileArc(overlayCtx);
     overlayCtx.lineWidth = wAlpha;
-    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+    overlayCtx.lineCap = 'round';
+    overlayCtx.strokeStyle = '#ffffff';
+    // Use clip with stroke path
+    // Draw base opaque white rounded pill
     overlayCtx.stroke();
 
-    // 2. Track inner & outer border lines
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    overlayCtx.lineWidth = 1;
-    overlayCtx.beginPath();
-    overlayCtx.arc(ax, ay, rAlpha - wAlpha / 2, 0, Math.PI * 2);
-    overlayCtx.stroke();
-    overlayCtx.beginPath();
-    overlayCtx.arc(ax, ay, rAlpha + wAlpha / 2, 0, Math.PI * 2);
-    overlayCtx.stroke();
-
-    // 3. Solid Color Alpha Arc (0% at 12 o'clock -> 100% clockwise)
-    const alphaEnd = alphaStart + alpha * Math.PI * 2;
-    if (alpha > 0.005) {
-      overlayCtx.beginPath();
-      overlayCtx.arc(ax, ay, rAlpha, alphaStart, alphaEnd);
-      overlayCtx.lineWidth = wAlpha;
-      overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-      overlayCtx.stroke();
-
-      // Highlight border on active arc
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-      overlayCtx.lineWidth = 1.2;
-      overlayCtx.beginPath();
-      overlayCtx.arc(ax, ay, rAlpha - wAlpha / 2, alphaStart, alphaEnd);
-      overlayCtx.stroke();
-      overlayCtx.beginPath();
-      overlayCtx.arc(ax, ay, rAlpha + wAlpha / 2, alphaStart, alphaEnd);
-      overlayCtx.stroke();
-
-      // High-contrast Thumb Knob
-      const kx = ax + rAlpha * Math.cos(alphaEnd);
-      const ky = ay + rAlpha * Math.sin(alphaEnd);
-      overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 9, 0, Math.PI * 2);
-      overlayCtx.fillStyle = '#ffffff';
-      overlayCtx.fill();
-      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.7)';
-      overlayCtx.lineWidth = 1.5;
-      overlayCtx.stroke();
-      overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 4, 0, Math.PI * 2);
-      overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-      overlayCtx.fill();
+    // 2. Checkerboard pattern inside the arc track
+    const checkStep = 5;
+    overlayCtx.save();
+    traceSmileArc(overlayCtx);
+    overlayCtx.lineWidth = wAlpha - 2;
+    overlayCtx.lineCap = 'round';
+    overlayCtx.save();
+    // Clip region
+    // Draw checkerboard squares
+    overlayCtx.fillStyle = '#e2e8f0';
+    for (let gy = ay + rAlpha * 0.5; gy < ay + rAlpha + wAlpha; gy += checkStep * 2) {
+      for (let gx = ax - rAlpha; gx < ax + rAlpha; gx += checkStep * 2) {
+        overlayCtx.fillRect(gx, gy, checkStep, checkStep);
+        overlayCtx.fillRect(gx + checkStep, gy + checkStep, checkStep, checkStep);
+      }
     }
+    overlayCtx.restore();
+
+    // 3. Smooth Transparency Ramp along the Arc: from 0% alpha (left) to 100% alpha (right)
+    const nSteps = 36;
+    const dStep = arcSpan / nSteps;
+    for (let i = 0; i < nSteps; i++) {
+      const a0 = arcStart + i * dStep;
+      const a1 = a0 + dStep + 0.02; // tiny overlap to prevent gap artifacts
+      const frac = (i + 0.5) / nSteps;
+      overlayCtx.beginPath();
+      overlayCtx.arc(ax, ay, rAlpha, a0, a1);
+      overlayCtx.lineWidth = wAlpha;
+      overlayCtx.lineCap = i === 0 || i === nSteps - 1 ? 'round' : 'butt';
+      overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${frac})`;
+      overlayCtx.stroke();
+    }
+
+    // 4. Track border outline (soft dark border like reference)
+    traceSmileArc(overlayCtx);
+    overlayCtx.lineWidth = wAlpha;
+    overlayCtx.lineCap = 'round';
+    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.15)';
+    overlayCtx.stroke();
+
+    // 5. Thumb Knob at current alpha position along the smile arc
+    const currentAngle = arcStart + alpha * arcSpan;
+    const kx = ax + rAlpha * Math.cos(currentAngle);
+    const ky = ay + rAlpha * Math.sin(currentAngle);
+
+    overlayCtx.beginPath();
+    overlayCtx.arc(kx, ky, 11, 0, Math.PI * 2);
+    overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+    overlayCtx.fill();
+    overlayCtx.lineWidth = 2.5;
+    overlayCtx.strokeStyle = '#ffffff';
+    overlayCtx.stroke();
+    overlayCtx.lineWidth = 1;
+    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.4)';
+    overlayCtx.stroke();
+
+    // 6. Percentage / Hex Indicator Badge at Center Bottom (like the '1C' / value badge in reference)
+    const badgeAngle = arcStart + arcSpan * 0.5; // Bottom center
+    const bx = ax + rAlpha * Math.cos(badgeAngle);
+    const by = ay + rAlpha * Math.sin(badgeAngle);
+    const badgeText = Math.round(alpha * 100).toString();
+
+    overlayCtx.beginPath();
+    const bw = 24, bh = 18, br = 4;
+    overlayCtx.roundRect(bx - bw / 2, by - bh / 2, bw, bh, br);
+    overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.6)';
+    overlayCtx.lineWidth = 1.2;
+    overlayCtx.stroke();
+
+    overlayCtx.fillStyle = '#0f172a';
+    overlayCtx.font = 'bold 10px monospace';
+    overlayCtx.textAlign = 'center';
+    overlayCtx.textBaseline = 'middle';
+    overlayCtx.fillText(badgeText, bx, by + 0.5);
+
     overlayCtx.restore();
 
     // ── Current 3D Coordinate Pick Circle Dot ──

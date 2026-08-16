@@ -641,15 +641,19 @@ export function createRoundedBoxPicker(
         return { u, v, w, inside };
       };
 
-      // Distance from center (ax, ay) to check whether pointer is dragging the Alpha Orbital Ring
+      // Check whether pointer is dragging the bottom Alpha Smile Arc (matches alpha ring.png)
       const distFromCenter = Math.hypot(p.x - ax, p.y - ay);
+      const arcStart = Math.PI * 0.72;
+      const arcSpan = Math.PI * 0.56;
 
-      if (distFromCenter >= s * 0.68) {
-        // Pointer is on / near the outer Alpha Orbital Ring: calculate angle and update alpha
-        // (Do NOT update cubeSatPointerPos so the cube indicator dot stays locked in place)
-        let ang = Math.atan2(p.y - ay, p.x - ax) + Math.PI / 2;
+      if (p.y >= ay + s * 0.38 && distFromCenter >= s * 0.65) {
+        // Pointer is on / near the bottom smile arc: calculate fraction from arcStart (left: 0%) to arcStart + arcSpan (right: 100%)
+        let ang = Math.atan2(p.y - ay, p.x - ax);
         if (ang < 0) ang += Math.PI * 2;
-        const newAlpha = Math.max(0, Math.min(1, ang / (Math.PI * 2)));
+        // Normalize against arcStart
+        let offset = ang - arcStart;
+        if (offset < 0) offset += Math.PI * 2;
+        const newAlpha = Math.max(0, Math.min(1, offset / arcSpan));
         setAlphaInternal(newAlpha);
         notify();
         return;
