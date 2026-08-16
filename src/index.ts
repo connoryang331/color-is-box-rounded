@@ -368,7 +368,8 @@ export function createRoundedBoxPicker(
   const hitDot = (clientX: number, clientY: number): boolean => {
     const p = toCanvas(clientX, clientY);
     const d = dotScreenPos();
-    return Math.hypot(p.x - d.x, p.y - d.y) <= 24; // generous hit zone for indicator dot
+    const hitRadius = guides.dotSensitivity || 36; // configurable generous hit zone for indicator dot (default 36px)
+    return Math.hypot(p.x - d.x, p.y - d.y) <= hitRadius;
   };
 
   const setAlphaInternal = (v: number) => {
@@ -935,6 +936,11 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getCubeSatSize: () => cubeSatSize,
+    setDotSensitivity: (radiusPx: number) => {
+      guides.dotSensitivity = Math.max(10, Math.min(100, radiusPx));
+      scheduleRender();
+    },
+    getDotSensitivity: () => guides.dotSensitivity || 36,
     setRotation: (yawDeg: number, pitchDeg: number) => {
       // Legacy API compatibility: reset object orientation and viewport (Y axis 0 deg)
       objMat = mat3FromEuler(pitchDeg * DEG, 0, yawDeg * DEG);

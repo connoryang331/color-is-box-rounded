@@ -530,6 +530,13 @@
               <input type="text" id="v-sat-size" value="165px" style="font-size: 11px; line-height: 22px;">
             </div>
           </div>
+          <div class="row" style="padding: 2px 0 2px 0;">
+            <span class="label" style="font-size: 11px;">DOT SENSITIVITY</span>
+            <div class="blender-slider" id="slider-dot-sens" style="width: 115px; height: 22px;">
+              <div class="bar" style="background: #ec4899;"></div>
+              <input type="text" id="v-dot-sens" value="36px" style="font-size: 11px; line-height: 22px;">
+            </div>
+          </div>
         </div>
       </div>
 
@@ -988,6 +995,7 @@
 
     const sZoom = makeGenericSlider('slider-zoom', 'v-zoom', () => picker.getZoom ? picker.getZoom() : 1.0, (v) => { if (picker.setZoom) picker.setZoom(v); }, 0.2, 2.5, 'x', 2);
     const sSatSize = makeGenericSlider('slider-sat-size', 'v-sat-size', () => picker.getCubeSatSize ? picker.getCubeSatSize() : 165, (v) => { if (picker.setCubeSatSize) picker.setCubeSatSize(v); }, 60, 320, 'px', 0);
+    const sDotSens = makeGenericSlider('slider-dot-sens', 'v-dot-sens', () => picker.getDotSensitivity ? picker.getDotSensitivity() : 36, (v) => { if (picker.setDotSensitivity) picker.setDotSensitivity(v); }, 10, 100, 'px', 0);
 
     const sSizeX = makeGenericSlider('slider-size-x', 'v-size-x', () => picker.getDimensions().sizeX, (v) => {
       const d = picker.getDimensions();
