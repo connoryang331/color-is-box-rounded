@@ -448,14 +448,14 @@ export function createRoundedBoxPicker(
     if (cubeSatAnchor && cubeSatReveal > 0.05) {
       const p = toCanvas(e.clientX, e.clientY);
       const s = cubeSatSize;
-      const rAlpha = s * 0.86;
-      const wAlpha = 22;
-      const safeMargin = rAlpha + wAlpha / 2 + 10;
+      const rAlpha = s * 1.08;
+      const wAlpha = 20;
+      const safeMargin = rAlpha + wAlpha / 2 + 12;
       const ax = Math.max(safeMargin, Math.min(rc.width - safeMargin, cubeSatAnchor.x));
       const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
       const distFromCenter = Math.hypot(p.x - ax, p.y - ay);
 
-      if (distFromCenter <= rAlpha + wAlpha / 2 + 12) {
+      if (distFromCenter <= rAlpha + wAlpha / 2 + 14) {
         // Clicked INSIDE the Cube SAT or its Alpha Ring: resume dragging / adjusting
         isCubeSatDrag = true;
         cubeSatOpened = true;
@@ -639,9 +639,9 @@ export function createRoundedBoxPicker(
       const radPitch = 19 * Math.PI / 180;
       const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
       const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
-      const rAlpha = s * 0.88;
-      const wAlpha = 18;
-      const safeMargin = rAlpha + wAlpha / 2 + 10;
+      const rAlpha = s * 1.08;
+      const wAlpha = 20;
+      const safeMargin = rAlpha + wAlpha / 2 + 12;
       const ax = Math.max(safeMargin, Math.min(rc.width - safeMargin, cubeSatAnchor.x));
       const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
 

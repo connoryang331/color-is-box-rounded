@@ -662,13 +662,13 @@ export function renderRoundedBox(
 
     const baseSize = cubeSat.size || 140;
     const s = baseSize * (0.65 + 0.35 * progress);
-    // Outer boundary margin to ensure neither the 3D cube nor the Alpha Orbital Ring get clipped:
-    const rAlpha = s * 0.86;
-    const wAlpha = 22;
+    // Spacious Alpha Orbital Ring radius maintaining >25px clean gap around all 3D cube edges:
+    const rAlpha = s * 1.08;
+    const wAlpha = 20;
 
     let ax = cubeSat.anchor.x;
     let ay = cubeSat.anchor.y;
-    const safeMargin = rAlpha + wAlpha / 2 + 10;
+    const safeMargin = rAlpha + wAlpha / 2 + 12;
     ax = Math.max(safeMargin, Math.min(width - safeMargin, ax));
     ay = Math.max(safeMargin, Math.min(height - safeMargin, ay));
 
