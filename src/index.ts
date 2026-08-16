@@ -643,21 +643,15 @@ export function createRoundedBoxPicker(
         return { u, v, w, inside };
       };
 
-      // Check whether pointer is dragging the bottom Alpha Smile Arc (matches alpha ring.png)
+      // Check whether pointer is dragging the 360° Alpha Orbital Ring
       const distFromCenter = Math.hypot(p.x - ax, p.y - ay);
-      const arcStart = Math.PI * 0.72;
-      const arcSpan = Math.PI * 0.56;
+      const isOnAlphaRing = Math.abs(distFromCenter - rAlpha) <= (wAlpha / 2 + 6);
 
-      // Only activate when pointer is STRICTLY on the smile arc band itself (rAlpha ± (wAlpha/2 + 6px))
-      const isOnSmileBand = Math.abs(distFromCenter - rAlpha) <= (wAlpha / 2 + 6);
-
-      if (p.y >= ay + s * 0.45 && isOnSmileBand) {
-        // Pointer is directly on the bottom smile arc: calculate fraction from arcStart (left: 0%) to arcStart + arcSpan (right: 100%)
-        let ang = Math.atan2(p.y - ay, p.x - ax);
+      if (isOnAlphaRing) {
+        // Pointer is on the 360° Alpha ring: calculate angle clockwise from 12 o'clock (-PI/2)
+        let ang = Math.atan2(p.y - ay, p.x - ax) + Math.PI / 2;
         if (ang < 0) ang += Math.PI * 2;
-        let offset = ang - arcStart;
-        if (offset < 0) offset += Math.PI * 2;
-        const newAlpha = Math.max(0, Math.min(1, offset / arcSpan));
+        const newAlpha = Math.max(0, Math.min(1, ang / (Math.PI * 2)));
         setAlphaInternal(newAlpha);
         notify();
         return;

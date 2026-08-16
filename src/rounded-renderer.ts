@@ -770,76 +770,65 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1.2;
     overlayCtx.stroke();
 
-    // ── 4. Alpha Smile Arc Slider at Bottom (Matches alpha ring.png reference) ──
-    const arcStart = Math.PI * 0.72; // ~130° (Left side of smile arc)
-    const arcEnd = Math.PI * 0.28;   // ~50° (Right side of smile arc, wrapping through bottom PI/2)
-    const arcSpan = Math.PI * 0.56;  // Total arc length
+    // ── 4. Complete 360° Alpha Ring (Full Circle with Integrated Checkerboard Texture) ──
+    const start = -Math.PI / 2; // 12 o'clock
 
     overlayCtx.save();
 
-    // Helper to trace the smile arc with rounded caps
-    const traceSmileArc = (ctx: CanvasRenderingContext2D) => {
-      ctx.beginPath();
-      ctx.arc(ax, ay, rAlpha, arcStart, arcStart + arcSpan, false);
-    };
+    // 1. Checkerboard Background texture precisely clipped inside the full ring band
+    overlayCtx.save();
+    overlayCtx.beginPath();
+    overlayCtx.arc(ax, ay, rAlpha + wAlpha / 2, 0, Math.PI * 2);
+    overlayCtx.arc(ax, ay, Math.max(0.5, rAlpha - wAlpha / 2), 0, Math.PI * 2, true);
+    overlayCtx.closePath();
+    overlayCtx.clip();
 
-    // 1. Clip to the smile arc area for the internal checkerboard background
-    overlayCtx.save();
-    traceSmileArc(overlayCtx);
-    overlayCtx.lineWidth = wAlpha;
-    overlayCtx.lineCap = 'round';
-    overlayCtx.strokeStyle = '#ffffff';
-    // Use clip with stroke path
-    // Draw base opaque white rounded pill
-    overlayCtx.stroke();
+    // Fill ring background white
+    overlayCtx.fillStyle = '#ffffff';
+    overlayCtx.fill();
 
-    // 2. Checkerboard pattern inside the arc track
-    const checkStep = 5;
-    overlayCtx.save();
-    traceSmileArc(overlayCtx);
-    overlayCtx.lineWidth = wAlpha - 2;
-    overlayCtx.lineCap = 'round';
-    overlayCtx.save();
-    // Clip region
-    // Draw checkerboard squares
-    overlayCtx.fillStyle = '#e2e8f0';
-    for (let gy = ay + rAlpha * 0.5; gy < ay + rAlpha + wAlpha; gy += checkStep * 2) {
-      for (let gx = ax - rAlpha; gx < ax + rAlpha; gx += checkStep * 2) {
+    // Draw checkerboard tiles inside the clipped ring
+    const checkStep = 4;
+    const rr = rAlpha + wAlpha / 2;
+    overlayCtx.fillStyle = '#cbd5e1';
+    for (let gy = ay - rr; gy < ay + rr; gy += checkStep * 2) {
+      for (let gx = ax - rr; gx < ax + rr; gx += checkStep * 2) {
         overlayCtx.fillRect(gx, gy, checkStep, checkStep);
         overlayCtx.fillRect(gx + checkStep, gy + checkStep, checkStep, checkStep);
       }
     }
     overlayCtx.restore();
 
-    // 3. Smooth Transparency Ramp along the Arc: from 0% alpha (left) to 100% alpha (right)
-    const nSteps = 36;
-    const dStep = arcSpan / nSteps;
-    for (let i = 0; i < nSteps; i++) {
-      const a0 = arcStart + i * dStep;
-      const a1 = a0 + dStep + 0.02; // tiny overlap to prevent gap artifacts
-      const frac = (i + 0.5) / nSteps;
+    // 2. Smooth Transparency Ramp: 0% at 12 o'clock -> 100% clockwise around the full circle
+    const nSegs = 72;
+    const segStep = (Math.PI * 2) / nSegs;
+    for (let i = 0; i < nSegs; i++) {
+      const a0 = start + i * segStep;
+      const frac = (i + 0.5) / nSegs;
       overlayCtx.beginPath();
-      overlayCtx.arc(ax, ay, rAlpha, a0, a1);
+      overlayCtx.arc(ax, ay, rAlpha, a0, a0 + segStep + 0.015);
       overlayCtx.lineWidth = wAlpha;
-      overlayCtx.lineCap = i === 0 || i === nSteps - 1 ? 'round' : 'butt';
       overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${frac})`;
       overlayCtx.stroke();
     }
 
-    // 4. Track border outline (soft dark border like reference)
-    traceSmileArc(overlayCtx);
-    overlayCtx.lineWidth = wAlpha;
-    overlayCtx.lineCap = 'round';
-    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.15)';
+    // 3. Inner & Outer Track Border Lines
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    overlayCtx.lineWidth = 1;
+    overlayCtx.beginPath();
+    overlayCtx.arc(ax, ay, rAlpha - wAlpha / 2, 0, Math.PI * 2);
+    overlayCtx.stroke();
+    overlayCtx.beginPath();
+    overlayCtx.arc(ax, ay, rAlpha + wAlpha / 2, 0, Math.PI * 2);
     overlayCtx.stroke();
 
-    // 5. Thumb Knob at current alpha position along the smile arc
-    const currentAngle = arcStart + alpha * arcSpan;
+    // 4. Thumb Knob at current alpha position
+    const currentAngle = start + alpha * Math.PI * 2;
     const kx = ax + rAlpha * Math.cos(currentAngle);
     const ky = ay + rAlpha * Math.sin(currentAngle);
 
     overlayCtx.beginPath();
-    overlayCtx.arc(kx, ky, 11, 0, Math.PI * 2);
+    overlayCtx.arc(kx, ky, 10, 0, Math.PI * 2);
     overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
     overlayCtx.fill();
     overlayCtx.lineWidth = 2.5;
@@ -848,27 +837,6 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1;
     overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.4)';
     overlayCtx.stroke();
-
-    // 6. Percentage / Hex Indicator Badge at Center Bottom (like the '1C' / value badge in reference)
-    const badgeAngle = arcStart + arcSpan * 0.5; // Bottom center
-    const bx = ax + rAlpha * Math.cos(badgeAngle);
-    const by = ay + rAlpha * Math.sin(badgeAngle);
-    const badgeText = Math.round(alpha * 100).toString();
-
-    overlayCtx.beginPath();
-    const bw = 24, bh = 18, br = 4;
-    overlayCtx.roundRect(bx - bw / 2, by - bh / 2, bw, bh, br);
-    overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    overlayCtx.fill();
-    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.6)';
-    overlayCtx.lineWidth = 1.2;
-    overlayCtx.stroke();
-
-    overlayCtx.fillStyle = '#0f172a';
-    overlayCtx.font = 'bold 10px monospace';
-    overlayCtx.textAlign = 'center';
-    overlayCtx.textBaseline = 'middle';
-    overlayCtx.fillText(badgeText, bx, by + 0.5);
 
     overlayCtx.restore();
 
