@@ -637,27 +637,23 @@ export function createRoundedBoxPicker(
         v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
         w = 1.0;
       } else if (p.x <= T_front.x) {
-        // --- LEFT FACE (Dark shadow face) ---
-        // Vertical Y along (T_left/T_front -> B_left/B_front): down is 0 (pure black), up is 1
-        const yTopAvg = (T_left.y + T_front.y) / 2;
-        const yBotAvg = (B_left.y + B_front.y) / 2;
-        const vertFraction = (yBotAvg - p.y) / (yBotAvg - yTopAvg || 1); // 0 at bottom, 1 at top
-        const horizFraction = (p.x - B_left.x) / (B_front.x - B_left.x || 1);
+        // --- LEFT FACE: base color (front edge) → pure black (left edge) ---
+        // horizFraction: 0 at T_front edge (base color), 1 at T_left edge (black)
+        const horizFraction = 1 - Math.max(0, Math.min(1,
+          (p.x - B_left.x) / (B_front.x - B_left.x || 1)));
 
-        u = 0.0;
-        v = Math.max(0, Math.min(1, horizFraction));
-        w = Math.max(0, Math.min(1, vertFraction)); // w -> 0 reaches pure black smoothly
+        u = 0.0;                                         // no hue shift
+        v = Math.max(0, Math.min(1, 1 - horizFraction)); // sat: 100% at front, 0% at far-left (pure black)
+        w = Math.max(0, Math.min(1, 1 - horizFraction)); // bri: 100% at front, 0% at far-left
       } else {
-        // --- RIGHT FACE (Bright highlight face) ---
-        // Right face spans from T_front/B_front to T_right/B_right
-        const yTopAvg = (T_front.y + T_right.y) / 2;
-        const yBotAvg = (B_front.y + B_right.y) / 2;
-        const vertFraction = (yBotAvg - p.y) / (yBotAvg - yTopAvg || 1);
-        const horizFraction = (p.x - T_front.x) / (T_right.x - T_front.x || 1);
+        // --- RIGHT FACE: base color (front edge) → pure white (right edge) ---
+        // horizFraction: 0 at T_front edge (base color), 1 at T_right edge (white)
+        const horizFraction = Math.max(0, Math.min(1,
+          (p.x - T_front.x) / (T_right.x - T_front.x || 1)));
 
-        u = Math.max(0, Math.min(1, horizFraction));
-        v = Math.max(0, Math.min(1, 0.5 + horizFraction * 0.5));
-        w = Math.max(0, Math.min(1, vertFraction));
+        u = 0.0;                                          // no hue shift
+        v = Math.max(0, Math.min(1, 1 - horizFraction));  // sat: 100% at front, 0% at far-right (pure white)
+        w = 1.0;                                           // bri: always 100% on right face
       }
 
       cubeSatPointerPos = p;
