@@ -577,8 +577,10 @@ export function createRoundedBoxPicker(
       const radPitch = 19 * Math.PI / 180;
       const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
       const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
-      const ax = cubeSatAnchor.x;
-      const ay = cubeSatAnchor.y;
+      const marginX = s * 0.44 * 1.5;
+      const marginY = s * 0.44 * 1.5;
+      const ax = Math.max(marginX, Math.min(rc.width - marginX, cubeSatAnchor.x));
+      const ay = Math.max(marginY, Math.min(rc.height - marginY, cubeSatAnchor.y));
 
       const proj = (px: number, py: number, pz: number): Vec2 => {
         const x1 = px * cy + pz * sy;

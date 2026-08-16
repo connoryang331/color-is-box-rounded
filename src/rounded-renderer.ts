@@ -659,8 +659,14 @@ export function renderRoundedBox(
 
     const baseSize = cubeSat.size || 140;
     const s = baseSize * (0.65 + 0.35 * progress);
-    const ax = cubeSat.anchor.x;
-    const ay = cubeSat.anchor.y;
+    let ax = cubeSat.anchor.x;
+    let ay = cubeSat.anchor.y;
+
+    // Safety margin to prevent the 3D cube from being clipped by canvas edges:
+    const marginX = s * 0.44 * 1.5;
+    const marginY = s * 0.44 * 1.5;
+    ax = Math.max(marginX, Math.min(width - marginX, ax));
+    ay = Math.max(marginY, Math.min(height - marginY, ay));
 
     // 3D Rotated Perspective for the Cube SAT matching 3d cube sat.png:
     // Perfect regular cube [-1, 1]^3 rotated slightly to the left (Yaw = -33°, Pitch = 19°)
