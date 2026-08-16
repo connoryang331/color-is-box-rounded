@@ -510,14 +510,14 @@
         <!-- Dot Press Tuning Single-Select Radio Mode -->
         <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 8px 0 4px 0; padding-top: 4px; border-top: 1px dashed var(--border-dashed);">Dot Press Tuning Mode (Single Choice)</div>
         <div class="guide-grid" style="grid-template-columns: 1fr;">
-          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-cube-sat" value="cube_sat" checked> 3D Cube SAT</label>
-          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-dual-rings" value="rings"> Dual Rings</label>
-          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-sv-tri" value="triangle"> SV Tri</label>
+          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-cube-sat" value="3d_sat" checked> 🪐 3D SAT</label>
+          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-dual-rings" value="rings"> 🔘 Dual Rings</label>
+          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-sv-tri" value="triangle"> 🔺 SV Tri</label>
         </div>
 
-        <!-- 3D SAT Shape (Cube, Cuboid, Pyramid) Single Choice -->
+        <!-- 3D SAT Shape Single Choice -->
         <div id="cube-mapping-box" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-dashed);">
-          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin-bottom: 4px;">SAT 3D Shape (Single Choice)</div>
+          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin-bottom: 4px;">3D SAT Shape (Single Choice)</div>
           <div class="guide-grid" style="grid-template-columns: 1fr;">
             <label class="guide-toggle-item"><input type="radio" name="sat-shape-choice" id="rad-shape-cube" value="cube" checked> 🧊 Cube (正方体)</label>
             <label class="guide-toggle-item"><input type="radio" name="sat-shape-choice" id="rad-shape-cuboid" value="cuboid"> 📦 Cuboid (长方体)</label>
@@ -526,14 +526,14 @@
             <label class="guide-toggle-item"><input type="radio" name="sat-shape-choice" id="rad-shape-cylinder" value="cylinder"> 🛢️ Cylinder (圆柱体)</label>
           </div>
 
-          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 8px 0 4px 0; padding-top: 4px; border-top: 1px dashed var(--border-dashed);">Cube Mapping (Single Choice)</div>
+          <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 8px 0 4px 0; padding-top: 4px; border-top: 1px dashed var(--border-dashed);">3D SAT Mapping (Single Choice)</div>
           <div class="guide-grid" style="grid-template-columns: 1fr;">
             <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-1" value="temp_sat_bri" checked> 1. Temp / Sat / Bri (🌡️🌈🔆)</label>
             <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-2" value="hsv"> 2. 3D HSV (H / S / V)</label>
             <label class="guide-toggle-item"><input type="radio" name="cube-mapping-rule" id="rad-rule-3" value="oklch"> 3. 3D OKLCH (L / C / H)</label>
           </div>
           <div class="row" style="padding: 4px 0 2px 0; margin-top: 4px;">
-            <span class="label" style="font-size: 11px;">CUBE SAT SIZE</span>
+            <span class="label" style="font-size: 11px;">3D SAT SIZE</span>
             <div class="blender-slider" id="slider-sat-size" style="width: 115px; height: 22px;">
               <div class="bar" style="background: #a855f7;"></div>
               <input type="text" id="v-sat-size" value="165px" style="font-size: 11px; line-height: 22px;">
@@ -561,14 +561,14 @@
             </div>
           </div>
           <div class="row" style="padding: 2px 0 2px 0;">
-            <span class="label" style="font-size: 11px;">CUBE PITCH</span>
+            <span class="label" style="font-size: 11px;">3D SAT PITCH</span>
             <div class="blender-slider" id="slider-cube-pitch" style="width: 115px; height: 22px;">
               <div class="bar" style="background: #eab308;"></div>
               <input type="text" id="v-cube-pitch" value="19.0°" style="font-size: 11px; line-height: 22px;">
             </div>
           </div>
           <div class="row" style="padding: 2px 0 2px 0;">
-            <span class="label" style="font-size: 11px;">CUBE YAW</span>
+            <span class="label" style="font-size: 11px;">3D SAT YAW</span>
             <div class="blender-slider" id="slider-cube-yaw" style="width: 115px; height: 22px;">
               <div class="bar" style="background: #f97316;"></div>
               <input type="text" id="v-cube-yaw" value="-33.0°" style="font-size: 11px; line-height: 22px;">

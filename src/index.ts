@@ -1213,13 +1213,28 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getSatShape: () => satShape || 'cube',
+    setSat3DMapping: (sm: Sat3DMapping) => {
+      guides.sat3DMapping = sm;
+      guides.cubeSatMapping = sm;
+      scheduleRender();
+    },
+    getSat3DMapping: () => guides.sat3DMapping || guides.cubeSatMapping || 'temp_sat_bri',
     setCubeSatMapping: (csm: CubeSatMapping) => {
+      guides.sat3DMapping = csm;
       guides.cubeSatMapping = csm;
       scheduleRender();
     },
-    getCubeSatMapping: () => guides.cubeSatMapping || 'temp_sat_bri',
+    getCubeSatMapping: () => guides.sat3DMapping || guides.cubeSatMapping || 'temp_sat_bri',
+    setSat3DSize: (sz: number) => {
+      cubeSatSize = Math.max(60, Math.min(320, sz));
+      guides.sat3DSize = cubeSatSize;
+      guides.cubeSatSize = cubeSatSize;
+      scheduleRender();
+    },
+    getSat3DSize: () => cubeSatSize,
     setCubeSatSize: (sz: number) => {
       cubeSatSize = Math.max(60, Math.min(320, sz));
+      guides.sat3DSize = cubeSatSize;
       guides.cubeSatSize = cubeSatSize;
       scheduleRender();
     },
@@ -1241,9 +1256,24 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getAlphaRingWidth: () => alphaRingWidth,
+    setSat3DOrientation: (pitchDeg: number, yawDeg: number) => {
+      cubeSatPitch = Math.max(-45, Math.min(45, pitchDeg));
+      cubeSatYaw = Math.max(-90, Math.min(90, yawDeg));
+      guides.sat3DPitch = cubeSatPitch;
+      guides.sat3DYaw = cubeSatYaw;
+      guides.cubeSatPitch = cubeSatPitch;
+      guides.cubeSatYaw = cubeSatYaw;
+      scheduleRender();
+    },
+    getSat3DOrientation: () => ({
+      pitchDeg: cubeSatPitch !== undefined ? cubeSatPitch : 19,
+      yawDeg: cubeSatYaw !== undefined ? cubeSatYaw : -33,
+    }),
     setCubeSatOrientation: (pitchDeg: number, yawDeg: number) => {
       cubeSatPitch = Math.max(-45, Math.min(45, pitchDeg));
       cubeSatYaw = Math.max(-90, Math.min(90, yawDeg));
+      guides.sat3DPitch = cubeSatPitch;
+      guides.sat3DYaw = cubeSatYaw;
       guides.cubeSatPitch = cubeSatPitch;
       guides.cubeSatYaw = cubeSatYaw;
       scheduleRender();

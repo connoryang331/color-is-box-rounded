@@ -72,8 +72,9 @@ export const DEFAULT_EDGE_CONFIG: EdgeStyleConfig = {
   backOpacity: 0.25,
 };
 
-export type SatMode = 'rings' | 'triangle' | 'cube_sat';
-export type CubeSatMapping = 'temp_sat_bri' | 'hsv' | 'oklch';
+export type SatMode = 'rings' | 'triangle' | '3d_sat' | 'cube_sat';
+export type Sat3DMapping = 'temp_sat_bri' | 'hsv' | 'oklch';
+export type CubeSatMapping = Sat3DMapping;
 export type SatShape = 'cube' | 'cuboid' | 'pyramid' | 'pyramid_inverted' | 'cylinder';
 
 export interface GuideVisibility {
@@ -86,26 +87,30 @@ export interface GuideVisibility {
   angleGuides: boolean;
   /** Saturation triangle overlay (current color / white / black), draggable to adjust saturation & brightness */
   svTriangle: boolean;
-  /** Tuning mode when pressing the pick indicator: 'rings' | 'triangle' | 'cube_sat' */
+  /** Tuning mode when pressing the pick indicator: 'rings' | 'triangle' | '3d_sat' */
   satMode: SatMode;
   /** 3D Geometric Shape for the SAT popup: 'cube' | 'cuboid' | 'pyramid' | 'pyramid_inverted' | 'cylinder' */
   satShape: SatShape;
-  /** Coordinate mapping rule for 3D Cube SAT */
-  cubeSatMapping: CubeSatMapping;
-  /** Size in pixels for 3D Cube SAT popup (default 165, adjustable via wheel scroll or API) */
-  cubeSatSize: number;
+  /** Coordinate mapping rule for 3D SAT */
+  sat3DMapping: Sat3DMapping;
+  cubeSatMapping?: CubeSatMapping; // Backward-compatibility alias
+  /** Size in pixels for 3D SAT popup (default 165, adjustable via wheel scroll or API) */
+  sat3DSize: number;
+  cubeSatSize?: number; // Backward-compatibility alias
   /** Press hit sensitivity radius for the indicator pick dot in pixels (default 36px, range 12px ~ 80px) */
   dotSensitivity: number;
-  /** Hold duration threshold in milliseconds before triggering 3D Cube SAT on surface press (default 300ms, range 0ms ~ 800ms) */
+  /** Hold duration threshold in milliseconds before triggering 3D SAT on surface press (default 300ms, range 0ms ~ 800ms) */
   holdDelayMs: number;
-  /** Radius multiplier for the Alpha Orbital Ring around Cube SAT relative to size (default 0.92, range 0.75 ~ 1.30) */
+  /** Radius multiplier for the Alpha Orbital Ring around 3D SAT relative to size (default 0.92, range 0.75 ~ 1.30) */
   alphaRingRadius: number;
   /** Stroke thickness of the Alpha Orbital Ring in pixels (default 16px, range 8px ~ 32px) */
   alphaRingWidth: number;
-  /** 3D Cube SAT Isometric Pitch angle in degrees (default 19°, range -45° ~ 45°) */
-  cubeSatPitch: number;
-  /** 3D Cube SAT Isometric Yaw angle in degrees (default -33°, range -90° ~ 90°) */
-  cubeSatYaw: number;
+  /** 3D SAT Isometric Pitch angle in degrees (default 19°, range -45° ~ 45°) */
+  sat3DPitch: number;
+  cubeSatPitch?: number; // Backward-compatibility alias
+  /** 3D SAT Isometric Yaw angle in degrees (default -33°, range -90° ~ 90°) */
+  sat3DYaw: number;
+  cubeSatYaw?: number; // Backward-compatibility alias
   /** Temperature shift range in degrees for Top face (default 35°, range 10° ~ 90°) */
   temperatureRange: number;
   /** Visual radius in pixels for indicator knobs and dots (default 9px, range 5px ~ 16px) */
@@ -125,15 +130,19 @@ export const DEFAULT_GUIDES: GuideVisibility = {
   centerZ: true,
   angleGuides: true,
   svTriangle: true,
-  satMode: 'cube_sat',
+  satMode: '3d_sat',
   satShape: 'cube',
+  sat3DMapping: 'temp_sat_bri',
   cubeSatMapping: 'temp_sat_bri',
+  sat3DSize: 165,
   cubeSatSize: 165,
   dotSensitivity: 36,
   holdDelayMs: 300,
   alphaRingRadius: 0.92,
   alphaRingWidth: 16,
+  sat3DPitch: 19,
   cubeSatPitch: 19,
+  sat3DYaw: -33,
   cubeSatYaw: -33,
   temperatureRange: 35,
   indicatorKnobRadius: 9,
@@ -164,14 +173,20 @@ export interface RoundedBoxColorPicker {
   getSatMode(): SatMode;
   setSatShape(shape: SatShape): void;
   getSatShape(): SatShape;
+  setSat3DMapping(mapping: Sat3DMapping): void;
+  getSat3DMapping(): Sat3DMapping;
   setCubeSatMapping(mapping: CubeSatMapping): void;
   getCubeSatMapping(): CubeSatMapping;
+  setSat3DSize(size: number): void;
+  getSat3DSize(): number;
   setCubeSatSize(size: number): void;
   getCubeSatSize(): number;
   setAlphaRingRadius(multiplier: number): void;
   getAlphaRingRadius(): number;
   setAlphaRingWidth(widthPx: number): void;
   getAlphaRingWidth(): number;
+  setSat3DOrientation(pitchDeg: number, yawDeg: number): void;
+  getSat3DOrientation(): { pitchDeg: number; yawDeg: number };
   setCubeSatOrientation(pitchDeg: number, yawDeg: number): void;
   getCubeSatOrientation(): { pitchDeg: number; yawDeg: number };
   setTemperatureRange(degrees: number): void;

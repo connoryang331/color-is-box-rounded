@@ -14,8 +14,8 @@ export const RING_MID_GAP = 8;
 /** Band width of BOTH rings, in canvas px. */
 export const RING_W = 16;
 
-/** Visible state of the 3D Cube SAT popup (passed to the renderer each frame). */
-export interface CubeSatState {
+/** Visible state of the 3D SAT popup (passed to the renderer each frame). */
+export interface Sat3DState {
   anchor: Vec2;           // Screen center of the popup
   reveal: number;           // 0..1 animation progress
   size: number;             // Width / height in px (e.g. 150)
@@ -23,7 +23,7 @@ export interface CubeSatState {
   currentCoord: Vec3;       // Current internal coord (u, v, w) in [0, 1]
   mapping: 'temp_sat_bri' | 'hsv' | 'oklch';
   pointerPos?: Vec2 | null; // Direct pointer canvas coordinates
-  currentColor?: RGBColor | null; // Live adjusted color from the Cube SAT
+  currentColor?: RGBColor | null; // Live adjusted color from the 3D SAT
   alphaRingRadius?: number; // Multiplier relative to s (default 0.92)
   alphaRingWidth?: number;  // Stroke thickness in px (default 16)
   shape?: 'cube' | 'cuboid' | 'pyramid' | 'pyramid_inverted' | 'cylinder'; // 3D geometry shape (default 'cube')
@@ -33,6 +33,7 @@ export interface CubeSatState {
   indicatorKnobRadius?: number; // Knob and dot radius in px (default 9)
   checkerSize?: number;     // Checkerboard square size in px (default 4)
 }
+export type CubeSatState = Sat3DState; // Backward-compatibility alias
 
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
 export interface RingState {
