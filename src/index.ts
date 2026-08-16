@@ -532,9 +532,9 @@ export function createRoundedBoxPicker(
         svMix = sv;
         applyTriangleMix(sv);
       } else if (!isShiftHeld && hitDot(e.clientX, e.clientY)) {
-        // Press & hold the pick dot = reveal the tuning mode chosen by guides.satMode ('cube_sat' | 'rings' | 'triangle')
-        const chosenMode = guides.satMode || 'cube_sat';
-        if (chosenMode === 'cube_sat') {
+        // Press & hold the pick dot = reveal the tuning mode chosen by guides.satMode ('3d_sat' | 'rings' | 'triangle')
+        const chosenMode = guides.satMode || '3d_sat';
+        if (chosenMode === '3d_sat' || chosenMode === 'cube_sat') {
           isCubeSatDrag = true;
           cubeSatOpened = true;
           cubeSatPressPt = toCanvas(e.clientX, e.clientY);
@@ -565,11 +565,11 @@ export function createRoundedBoxPicker(
       } else if (raycastAt(e.clientX, e.clientY)) {
         // Left Click on Box surface: Pick color immediately
         pickColorAtScreen(e.clientX, e.clientY);
-        const chosenMode = guides.satMode || 'cube_sat';
+        const chosenMode = guides.satMode || '3d_sat';
         const delay = guides.holdDelayMs !== undefined ? guides.holdDelayMs : 300;
 
-        if (chosenMode === 'cube_sat') {
-          // Arm 3D Cube SAT on surface press: opens immediately if delay <= 0, or after holdDelayMs / drag
+        if (chosenMode === '3d_sat' || chosenMode === 'cube_sat') {
+          // Arm 3D SAT on surface press: opens immediately if delay <= 0, or after holdDelayMs / drag
           isCubeSatDrag = true;
           cubeSatPressPt = toCanvas(e.clientX, e.clientY);
           cubeSatAnchor = dotScreenPos();
