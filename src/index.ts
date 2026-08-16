@@ -471,6 +471,7 @@ export function createRoundedBoxPicker(
           cubeSatAnchor = dotScreenPos();
           cubeSatColorAnchor = { ...dotValues };
           cubeSatCoord = { x: 0.5, y: 0.5, z: 0.5 };
+          cubeSatPointerPos = cubeSatAnchor;
           animateCubeSat(1);
           e.preventDefault();
         } else if (chosenMode === 'triangle') {
@@ -504,6 +505,7 @@ export function createRoundedBoxPicker(
           cubeSatAnchor = dotScreenPos();
           cubeSatColorAnchor = { ...dotValues };
           cubeSatCoord = { x: 0.5, y: 0.5, z: 0.5 };
+          cubeSatPointerPos = cubeSatAnchor;
 
           if (delay <= 0) {
             cubeSatOpened = true;

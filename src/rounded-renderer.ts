@@ -902,17 +902,13 @@ export function renderRoundedBox(
       return inside;
     };
 
-    // Default indicator dot rests at the 3D center / front ridge intersection
+    // Persistent indicator dot position inside the 3D cube (stays where last picked)
     let dotX = T_front.x;
     let dotY = T_front.y;
 
     if (cubeSat.pointerPos) {
-      const mouse = cubeSat.pointerPos;
-      if (pointInPoly(mouse, hull)) {
-        // Pointer is inside the 3D cube: dot follows mouse directly (1:1 with zero jump)
-        dotX = mouse.x;
-        dotY = mouse.y;
-      }
+      dotX = cubeSat.pointerPos.x;
+      dotY = cubeSat.pointerPos.y;
     }
 
     overlayCtx.beginPath();
