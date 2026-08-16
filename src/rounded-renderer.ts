@@ -693,12 +693,11 @@ export function renderRoundedBox(
     const B_right = proj3D( 1, -1, -1);
     const B_front = proj3D( 1, -1,  1);
 
-    // ── 1. Top Face (Hue / Temperature / Saturation blend) ──
-    const gradTop = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
+    // ── 1. Top Face (base hue) ──
     const baseCol = valuesToRgb(cubeSat.colorAnchor, mode);
-    gradTop.addColorStop(0, '#00a8ff');
-    gradTop.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-    gradTop.addColorStop(1, '#ff6b6b');
+    const gradTop = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
+    gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+    gradTop.addColorStop(1, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
 
     overlayCtx.beginPath();
     overlayCtx.moveTo(T_back.x, T_back.y);
@@ -706,14 +705,15 @@ export function renderRoundedBox(
     overlayCtx.lineTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_left.x, T_left.y);
     overlayCtx.closePath();
-    overlayCtx.fillStyle = gradTop;
+    overlayCtx.fillStyle = `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`;
     overlayCtx.fill();
     overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── 2. Left Face (Saturation -> Dark/Black Shading) ──
-    const gradLeft = overlayCtx.createLinearGradient(T_left.x, T_left.y, B_left.x, B_left.y);
+    // ── 2. Left Face: base color (front edge) → BLACK (left edge) — the "dark/shadow" half of SAT ──
+    // Gradient goes horizontally: from T_front (= base color) → T_left (= black)
+    const gradLeft = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_left.x, T_left.y);
     gradLeft.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradLeft.addColorStop(1, '#000000');
 
@@ -729,9 +729,10 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── 3. Right Face (Saturation -> Bright/Light/White Shading) ──
+    // ── 3. Right Face: base color (front edge) → WHITE (right edge) — the "bright/highlight" half of SAT ──
+    // Gradient goes horizontally: from T_front (= base color) → T_right (= white)
     const gradRight = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_right.x, T_right.y);
-    gradRight.addColorStop(0, `rgb(${Math.min(255, baseCol.r + 20)}, ${Math.min(255, baseCol.g + 20)}, ${Math.min(255, baseCol.b + 20)})`);
+    gradRight.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradRight.addColorStop(1, '#ffffff');
 
     overlayCtx.beginPath();
