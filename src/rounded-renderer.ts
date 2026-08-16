@@ -770,59 +770,68 @@ export function renderRoundedBox(
     overlayCtx.stroke();
 
     // ── 4. Alpha Orbital Ring surrounding the 3D Cube SAT ──
-    const rAlpha = s * 0.70;
-    const wRing = 10;
+    const rAlpha = s * 0.72;
+    const wAlpha = 14;
     const alphaStart = -Math.PI / 2; // 12 o'clock
 
-    // Dotted track background
+    const curRgb = valuesToRgb(dotValues, mode);
+    const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
+
     overlayCtx.save();
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-    overlayCtx.lineWidth = 2;
-    overlayCtx.setLineDash([3, 5]);
+    // 1. Semi-transparent track ring background
     overlayCtx.beginPath();
     overlayCtx.arc(ax, ay, rAlpha, 0, Math.PI * 2);
+    overlayCtx.lineWidth = wAlpha;
+    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
     overlayCtx.stroke();
-    overlayCtx.setLineDash([]);
 
-    // Solid Alpha Arc up to current alpha value
+    // 2. Track inner & outer border lines
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    overlayCtx.lineWidth = 1;
+    overlayCtx.beginPath();
+    overlayCtx.arc(ax, ay, rAlpha - wAlpha / 2, 0, Math.PI * 2);
+    overlayCtx.stroke();
+    overlayCtx.beginPath();
+    overlayCtx.arc(ax, ay, rAlpha + wAlpha / 2, 0, Math.PI * 2);
+    overlayCtx.stroke();
+
+    // 3. Solid Color Alpha Arc (0% at 12 o'clock -> 100% clockwise)
     const alphaEnd = alphaStart + alpha * Math.PI * 2;
     if (alpha > 0.005) {
       overlayCtx.beginPath();
       overlayCtx.arc(ax, ay, rAlpha, alphaStart, alphaEnd);
-      overlayCtx.lineWidth = wRing;
-      overlayCtx.strokeStyle = `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, 0.85)`;
+      overlayCtx.lineWidth = wAlpha;
+      overlayCtx.strokeStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
       overlayCtx.stroke();
 
-      // Outer & inner boundary lines for the arc
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-      overlayCtx.lineWidth = 1;
+      // Highlight border on active arc
+      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      overlayCtx.lineWidth = 1.2;
       overlayCtx.beginPath();
-      overlayCtx.arc(ax, ay, rAlpha - wRing / 2, alphaStart, alphaEnd);
+      overlayCtx.arc(ax, ay, rAlpha - wAlpha / 2, alphaStart, alphaEnd);
       overlayCtx.stroke();
       overlayCtx.beginPath();
-      overlayCtx.arc(ax, ay, rAlpha + wRing / 2, alphaStart, alphaEnd);
+      overlayCtx.arc(ax, ay, rAlpha + wAlpha / 2, alphaStart, alphaEnd);
       overlayCtx.stroke();
 
-      // Thumb knob marking current alpha position
+      // High-contrast Thumb Knob
       const kx = ax + rAlpha * Math.cos(alphaEnd);
       const ky = ay + rAlpha * Math.sin(alphaEnd);
       overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 7, 0, Math.PI * 2);
+      overlayCtx.arc(kx, ky, 8, 0, Math.PI * 2);
       overlayCtx.fillStyle = '#ffffff';
       overlayCtx.fill();
-      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.6)';
-      overlayCtx.lineWidth = 1.2;
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.7)';
+      overlayCtx.lineWidth = 1.5;
       overlayCtx.stroke();
       overlayCtx.beginPath();
-      overlayCtx.arc(kx, ky, 3, 0, Math.PI * 2);
+      overlayCtx.arc(kx, ky, 3.5, 0, Math.PI * 2);
       overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
       overlayCtx.fill();
     }
     overlayCtx.restore();
 
     // ── Current 3D Coordinate Pick Circle Dot ──
-    const curRgb = valuesToRgb(dotValues, mode);
-    const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
     // 2D Outer Hull of the visible Cube on screen:
     // Vertices in clockwise order: T_back -> T_right -> B_right -> B_front -> B_left -> T_left
