@@ -637,23 +637,27 @@ export function createRoundedBoxPicker(
         v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
         w = 1.0;
       } else if (p.x <= T_front.x) {
-        // --- LEFT FACE: base color (front edge) → pure black (left edge) ---
-        // horizFraction: 0 at T_front edge (base color), 1 at T_left edge (black)
-        const horizFraction = 1 - Math.max(0, Math.min(1,
-          (p.x - B_left.x) / (B_front.x - B_left.x || 1)));
-
-        u = 0.0;                                         // no hue shift
-        v = Math.max(0, Math.min(1, 1 - horizFraction)); // sat: 100% at front, 0% at far-left (pure black)
-        w = Math.max(0, Math.min(1, 1 - horizFraction)); // bri: 100% at front, 0% at far-left
+        // --- LEFT FACE: base color (T_front) → pure black (T_left) ---
+        // Mirror Canvas createLinearGradient(T_front, T_left): project p onto that axis
+        const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
+        const gLen2 = gx * gx + gy * gy || 1;
+        const darkness = Math.max(0, Math.min(1,
+          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+        // darkness: 0 at front edge (base color), 1 at left edge (black)
+        u = 0.0;
+        v = 1 - darkness;  // sat: 100% → 0%
+        w = 1 - darkness;  // bri: 100% → 0%
       } else {
-        // --- RIGHT FACE: base color (front edge) → pure white (right edge) ---
-        // horizFraction: 0 at T_front edge (base color), 1 at T_right edge (white)
-        const horizFraction = Math.max(0, Math.min(1,
-          (p.x - T_front.x) / (T_right.x - T_front.x || 1)));
-
-        u = 0.0;                                          // no hue shift
-        v = Math.max(0, Math.min(1, 1 - horizFraction));  // sat: 100% at front, 0% at far-right (pure white)
-        w = 1.0;                                           // bri: always 100% on right face
+        // --- RIGHT FACE: base color (T_front) → pure white (T_right) ---
+        // Mirror Canvas createLinearGradient(T_front, T_right): project p onto that axis
+        const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
+        const gLen2 = gx * gx + gy * gy || 1;
+        const whiteness = Math.max(0, Math.min(1,
+          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+        // whiteness: 0 at front edge (base color), 1 at right edge (white)
+        u = 0.0;
+        v = 1 - whiteness;  // sat: 100% → 0%
+        w = 1.0;             // bri: always 100%
       }
 
       cubeSatPointerPos = p;
