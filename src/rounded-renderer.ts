@@ -873,13 +873,31 @@ export function renderRoundedBox(
       return inside;
     };
 
-    // Persistent indicator dot position inside the 3D cube (stays where last picked)
+    // Persistent indicator dot clamped strictly inside or on the 3D cube boundary:
     let dotX = T_front.x;
     let dotY = T_front.y;
 
     if (cubeSat.pointerPos) {
-      dotX = cubeSat.pointerPos.x;
-      dotY = cubeSat.pointerPos.y;
+      const mouse = cubeSat.pointerPos;
+      if (pointInPoly(mouse, hull)) {
+        // Pointer is inside the 3D cube: dot follows mouse directly
+        dotX = mouse.x;
+        dotY = mouse.y;
+      } else {
+        // Pointer is outside the 3D cube: clamp dot strictly to the nearest point on the cube perimeter
+        let minD = Infinity;
+        let bestPt: Vec2 = { x: T_front.x, y: T_front.y };
+        for (let i = 0; i < hull.length; i++) {
+          const pt = closestOnSeg(mouse, hull[i], hull[(i + 1) % hull.length]);
+          const d = (pt.x - mouse.x) ** 2 + (pt.y - mouse.y) ** 2;
+          if (d < minD) {
+            minD = d;
+            bestPt = pt;
+          }
+        }
+        dotX = bestPt.x;
+        dotY = bestPt.y;
+      }
     }
 
     overlayCtx.beginPath();
