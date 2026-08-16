@@ -444,6 +444,39 @@ export function createRoundedBoxPicker(
   });
 
   rc.canvasGL.addEventListener('mousedown', (e) => {
+    // If 3D Cube SAT is currently open and visible:
+    if (cubeSatAnchor && cubeSatReveal > 0.05) {
+      const p = toCanvas(e.clientX, e.clientY);
+      const s = cubeSatSize;
+      const rAlpha = s * 0.86;
+      const wAlpha = 22;
+      const safeMargin = rAlpha + wAlpha / 2 + 10;
+      const ax = Math.max(safeMargin, Math.min(rc.width - safeMargin, cubeSatAnchor.x));
+      const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
+      const distFromCenter = Math.hypot(p.x - ax, p.y - ay);
+
+      if (distFromCenter <= rAlpha + wAlpha / 2 + 12) {
+        // Clicked INSIDE the Cube SAT or its Alpha Ring: resume dragging / adjusting
+        isCubeSatDrag = true;
+        cubeSatOpened = true;
+        cubeSatPressPt = p;
+        e.preventDefault();
+        return;
+      } else {
+        // Clicked OUTSIDE: close the 3D Cube SAT popup
+        cubeSatOpened = false;
+        if (cubeSatCurrentColor) {
+          dotValues = rgbToValues(cubeSatCurrentColor, mode);
+          cubeSatCurrentColor = null;
+          notify();
+        }
+        cubeSatPointerPos = null;
+        cubeSatColorAnchor = null;
+        animateCubeSat(0);
+        // Continue to normal pick or tumble below:
+      }
+    }
+
     if (isCubeSatDrag) return;
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       // Middle Click (or Alt+Left Click) = Blender Viewport 3D Tumble
@@ -796,16 +829,11 @@ export function createRoundedBoxPicker(
         cubeSatArmTimer = null;
       }
       isCubeSatDrag = false;
-      cubeSatOpened = false;
-      cubeSatPressPt = null;
+      // Do NOT close Cube SAT on mouseup; keep it open on screen until clicked outside
       if (cubeSatCurrentColor) {
         dotValues = rgbToValues(cubeSatCurrentColor, mode);
-        cubeSatCurrentColor = null;
         notify();
       }
-      cubeSatPointerPos = null;
-      cubeSatColorAnchor = null;
-      animateCubeSat(0);
     }
     if (isRingDrag) {
       if (ringArmTimer !== null) {

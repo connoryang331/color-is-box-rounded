@@ -504,16 +504,18 @@ export function renderRoundedBox(
     const rgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - rgb.r, g: 255 - rgb.g, b: 255 - rgb.b } : rgb;
 
-    // The dot always shows the current color itself: opaque when alpha = 100%, translucent
-    // (box showing through) when semi-transparent — no checkerboard pattern inside.
+    // The dot always shows the current color itself with a crisp white ring and outline
     overlayCtx.beginPath();
-    overlayCtx.arc(dotPos.x, dotPos.y, 8, 0, Math.PI * 2);
+    overlayCtx.arc(dotPos.x, dotPos.y, 9, 0, Math.PI * 2);
     overlayCtx.fillStyle = alpha < 1
       ? `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, ${alpha})`
       : `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
     overlayCtx.fill();
-    overlayCtx.strokeStyle = outlineFor(finalRgb.r, finalRgb.g, finalRgb.b);
     overlayCtx.lineWidth = 2.5;
+    overlayCtx.strokeStyle = '#ffffff';
+    overlayCtx.stroke();
+    overlayCtx.lineWidth = 1;
+    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
     overlayCtx.stroke();
   }
 
@@ -825,21 +827,25 @@ export function renderRoundedBox(
     overlayCtx.arc(ax, ay, rAlpha + wAlpha / 2, 0, Math.PI * 2);
     overlayCtx.stroke();
 
-    // 4. Thumb Knob at current alpha position
+    // Helper: Shared Unified Indicator Knob with white ring and contrast outline
+    const drawIndicatorKnob = (x: number, y: number, rgb: RGBColor) => {
+      overlayCtx.beginPath();
+      overlayCtx.arc(x, y, 9, 0, Math.PI * 2);
+      overlayCtx.fillStyle = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+      overlayCtx.fill();
+      overlayCtx.lineWidth = 2.5;
+      overlayCtx.strokeStyle = '#ffffff';
+      overlayCtx.stroke();
+      overlayCtx.lineWidth = 1;
+      overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+      overlayCtx.stroke();
+    };
+
+    // 4. Thumb Knob at current alpha position (Unified Style)
     const currentAngle = start + alpha * Math.PI * 2;
     const kx = ax + rAlpha * Math.cos(currentAngle);
     const ky = ay + rAlpha * Math.sin(currentAngle);
-
-    overlayCtx.beginPath();
-    overlayCtx.arc(kx, ky, 10, 0, Math.PI * 2);
-    overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-    overlayCtx.fill();
-    overlayCtx.lineWidth = 2.5;
-    overlayCtx.strokeStyle = '#ffffff';
-    overlayCtx.stroke();
-    overlayCtx.lineWidth = 1;
-    overlayCtx.strokeStyle = 'rgba(15, 23, 42, 0.4)';
-    overlayCtx.stroke();
+    drawIndicatorKnob(kx, ky, finalRgb);
 
     overlayCtx.restore();
 
@@ -900,18 +906,8 @@ export function renderRoundedBox(
       }
     }
 
-    overlayCtx.beginPath();
-    overlayCtx.arc(dotX, dotY, 5.5, 0, Math.PI * 2);
-    overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
-    overlayCtx.fill();
-    overlayCtx.strokeStyle = '#ffffff';
-    overlayCtx.lineWidth = 2;
-    overlayCtx.stroke();
-    overlayCtx.beginPath();
-    overlayCtx.arc(dotX, dotY, 6.5, 0, Math.PI * 2);
-    overlayCtx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-    overlayCtx.lineWidth = 1;
-    overlayCtx.stroke();
+    // Draw Cube SAT Pick Indicator Dot (Identical Unified Style)
+    drawIndicatorKnob(dotX, dotY, finalRgb);
 
     overlayCtx.restore();
   }
