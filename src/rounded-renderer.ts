@@ -1260,8 +1260,9 @@ export function renderRoundedBox(
     };
 
     // Persistent indicator dot clamped strictly inside or on the 3D cube boundary:
-    let dotX = T_front.x;
-    let dotY = T_front.y;
+    const centerProj = proj3D(0, 0, 0);
+    let dotX = centerProj.x;
+    let dotY = centerProj.y;
 
     if (cubeSat.pointerPos) {
       const mouse = cubeSat.pointerPos;
@@ -1272,7 +1273,7 @@ export function renderRoundedBox(
       } else {
         // Pointer is outside the 3D cube: clamp dot strictly to the nearest point on the cube perimeter
         let minD = Infinity;
-        let bestPt: Vec2 = { x: T_front.x, y: T_front.y };
+        let bestPt: Vec2 = { x: centerProj.x, y: centerProj.y };
         for (let i = 0; i < hull.length; i++) {
           const pt = closestOnSeg(mouse, hull[i], hull[(i + 1) % hull.length]);
           const d = (pt.x - mouse.x) ** 2 + (pt.y - mouse.y) ** 2;

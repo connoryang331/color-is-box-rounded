@@ -804,14 +804,27 @@ export function createRoundedBoxPicker(
         return;
       }
 
+      // General robust 3D coordinate estimation relative to hull bounding box / center:
+      // u: Horizontal position across geometry (pure black 0 <-> base 0.5 <-> pure white 1.0)
+      // v: Saturation / Temperature (0..1)
+      // w: Vertical position / Brightness (bottom dark 0 <-> top bright 1.0)
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const hp of hull) {
+        if (hp.x < minX) minX = hp.x;
+        if (hp.x > maxX) maxX = hp.x;
+        if (hp.y < minY) minY = hp.y;
+        if (hp.y > maxY) maxY = hp.y;
+      }
+      const spanX = maxX - minX || 1;
+      const spanY = maxY - minY || 1;
+      const relX = Math.max(0, Math.min(1, (p.x - minX) / spanX));
+      const relY = Math.max(0, Math.min(1, (p.y - minY) / spanY)); // 0 at top, 1 at bottom
+
       let u = 0.5, v = 0.5, w = 0.5;
 
       if (isPyramid) {
-        // Pyramid Left Face: Apex -> B_left -> B_front
         const pyrLeft = bary(p, ApexTop, B_front, B_left);
-        // Pyramid Right Face: Apex -> B_front -> B_right
         const pyrRight = bary(p, ApexTop, B_right, B_front);
-
         const vertDown = Math.max(0, Math.min(1, (p.y - ApexTop.y) / (B_front.y - ApexTop.y || 1)));
 
         if (pyrRight.inside) {
@@ -819,11 +832,15 @@ export function createRoundedBoxPicker(
           u = 0.5;
           v = Math.max(0, Math.min(1, 1 - whiteness * 0.85));
           w = Math.max(0.1, Math.min(1, (1 - vertDown * 0.55) * (0.6 + 0.4 * whiteness)));
-        } else {
+        } else if (pyrLeft.inside) {
           const blackness = Math.max(0, Math.min(1, (B_front.x - p.x) / (B_front.x - B_left.x || 1)));
           u = 0.5;
           v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
           w = Math.max(0, Math.min(1, (1 - blackness) * (1 - vertDown * 0.55)));
+        } else {
+          u = 0.5;
+          v = 1.0 - Math.abs(relX - 0.5) * 1.5;
+          w = 1.0 - relY * 0.8;
         }
       } else if (isPyramidInv) {
         const topT1 = bary(p, T_back, T_right, T_front);
@@ -837,17 +854,22 @@ export function createRoundedBoxPicker(
           w = 1.0;
         } else {
           const pyrInvLeft = bary(p, T_left, T_front, ApexBottom);
+          const pyrInvRight = bary(p, T_front, T_right, ApexBottom);
           const vertDown = Math.max(0, Math.min(1, (p.y - T_front.y) / (ApexBottom.y - T_front.y || 1)));
           if (pyrInvLeft.inside) {
             const blackness = Math.max(0, Math.min(1, (T_front.x - p.x) / (T_front.x - T_left.x || 1)));
             u = 0.5;
             v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
             w = Math.max(0, Math.min(1, (1 - blackness) * (1 - vertDown * 0.55)));
-          } else {
+          } else if (pyrInvRight.inside) {
             const whiteness = Math.max(0, Math.min(1, (p.x - T_front.x) / (T_right.x - T_front.x || 1)));
             u = 0.5;
             v = Math.max(0, Math.min(1, 1 - whiteness * 0.85));
             w = Math.max(0.1, Math.min(1, (1 - vertDown * 0.55) * (0.6 + 0.4 * whiteness)));
+          } else {
+            u = 0.5;
+            v = 1.0 - Math.abs(relX - 0.5) * 1.5;
+            w = 1.0 - relY * 0.8;
           }
         }
       } else if (isCylinder) {
@@ -925,7 +947,18 @@ export function createRoundedBoxPicker(
           v = 1.0;
           w = 1.0;
         } else {
-          return;
+          // Robust Fallback when rotating to non-standard face orientations (e.g. Yaw +41°, Pitch -45°)
+          if (relX < 0.5) {
+            const blackness = (0.5 - relX) * 2;
+            u = 0.5;
+            v = Math.max(0, Math.min(1, 1 - blackness * 0.85));
+            w = Math.max(0, Math.min(1, (1 - blackness) * (1 - relY * 0.6)));
+          } else {
+            const whiteness = (relX - 0.5) * 2;
+            u = 0.5;
+            v = Math.max(0, Math.min(1, 1 - whiteness * 0.85));
+            w = Math.max(0.1, Math.min(1, (1 - relY * 0.6) * (0.6 + 0.4 * whiteness)));
+          }
         }
       }
 
