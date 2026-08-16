@@ -693,24 +693,6 @@ export function renderRoundedBox(
     const B_right = proj3D( 1, -1, -1);
     const B_front = proj3D( 1, -1,  1);
 
-    // Draw backdrop card (subtle dark glassmorphism card for contrast)
-    overlayCtx.save();
-    overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-    overlayCtx.shadowBlur = 24;
-    overlayCtx.shadowOffsetY = 8;
-    overlayCtx.fillStyle = 'rgba(28, 28, 28, 0.88)';
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-    overlayCtx.lineWidth = 1;
-    const cardW = s * 1.6;
-    const cardH = s * 1.75;
-    const cardX = ax - cardW * 0.5;
-    const cardY = ay - cardH * 0.5;
-    overlayCtx.beginPath();
-    overlayCtx.roundRect ? overlayCtx.roundRect(cardX, cardY, cardW, cardH, 16) : overlayCtx.rect(cardX, cardY, cardW, cardH);
-    overlayCtx.fill();
-    overlayCtx.stroke();
-    overlayCtx.restore();
-
     // ── 1. Top Face (Hue / Temperature / Saturation blend) ──
     const gradTop = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
     const baseCol = valuesToRgb(cubeSat.colorAnchor, mode);
@@ -733,7 +715,7 @@ export function renderRoundedBox(
     // ── 2. Left Face (Saturation -> Dark/Black Shading) ──
     const gradLeft = overlayCtx.createLinearGradient(T_left.x, T_left.y, B_left.x, B_left.y);
     gradLeft.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-    gradLeft.addColorStop(1, '#050505');
+    gradLeft.addColorStop(1, '#000000');
 
     overlayCtx.beginPath();
     overlayCtx.moveTo(T_left.x, T_left.y);
@@ -779,98 +761,11 @@ export function renderRoundedBox(
     overlayCtx.lineTo(T_left.x, T_left.y);
     overlayCtx.moveTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
-    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
     overlayCtx.lineWidth = 1.2;
     overlayCtx.stroke();
 
-    // ── 4. Icons and Dual-ended Arrows (Reference: 🌡️ 🌈 🔆) ──
-    overlayCtx.save();
-    overlayCtx.strokeStyle = '#ffffff';
-    overlayCtx.fillStyle = '#ffffff';
-    overlayCtx.lineWidth = 1.4;
-
-    const drawDoubleArrow = (x1: number, y1: number, x2: number, y2: number) => {
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(x1, y1);
-      overlayCtx.lineTo(x2, y2);
-      overlayCtx.stroke();
-
-      const ang = Math.atan2(y2 - y1, x2 - x1);
-      const head = 4.5;
-      // Arrowhead 1
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(x1, y1);
-      overlayCtx.lineTo(x1 + head * Math.cos(ang + 0.5), y1 + head * Math.sin(ang + 0.5));
-      overlayCtx.moveTo(x1, y1);
-      overlayCtx.lineTo(x1 + head * Math.cos(ang - 0.5), y1 + head * Math.sin(ang - 0.5));
-      overlayCtx.stroke();
-      // Arrowhead 2
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(x2, y2);
-      overlayCtx.lineTo(x2 - head * Math.cos(ang + 0.5), y2 - head * Math.sin(ang + 0.5));
-      overlayCtx.moveTo(x2, y2);
-      overlayCtx.lineTo(x2 - head * Math.cos(ang - 0.5), y2 - head * Math.sin(ang - 0.5));
-      overlayCtx.stroke();
-    };
-
-    // (A) Top-Left: Thermometer / Temperature (🌡️ + diagonal arrows)
-    const iconTempX = ax - s * 0.44;
-    const iconTempY = ay - s * 0.64;
-    // Draw thermometer icon
-    overlayCtx.save();
-    overlayCtx.translate(iconTempX, iconTempY);
-    overlayCtx.beginPath();
-    overlayCtx.roundRect ? overlayCtx.roundRect(-2.5, -9, 5, 12, 2.5) : overlayCtx.rect(-2.5, -9, 5, 12);
-    overlayCtx.stroke();
-    overlayCtx.beginPath();
-    overlayCtx.arc(0, 5, 4.5, 0, Math.PI * 2);
-    overlayCtx.stroke();
-    overlayCtx.beginPath();
-    overlayCtx.arc(0, 5, 2.5, 0, Math.PI * 2);
-    overlayCtx.fill();
-    overlayCtx.restore();
-    // Diagonal double arrow along top-left edge
-    drawDoubleArrow(iconTempX + 10, iconTempY - 8, iconTempX + 26, iconTempY + 8);
-
-    // (B) Top-Right: Rainbow / Saturation (🌈 + vertical arrows)
-    const iconSatX = ax + s * 0.44;
-    const iconSatY = ay - s * 0.64;
-    // Draw rainbow arcs
-    overlayCtx.save();
-    overlayCtx.translate(iconSatX - 10, iconSatY);
-    overlayCtx.lineWidth = 1.4;
-    for (let r = 5; r <= 9; r += 2) {
-      overlayCtx.beginPath();
-      overlayCtx.arc(0, 2, r, Math.PI, 0);
-      overlayCtx.stroke();
-    }
-    overlayCtx.restore();
-    // Vertical arrow next to rainbow
-    drawDoubleArrow(iconSatX + 14, iconSatY - 14, iconSatX + 14, iconSatY + 14);
-
-    // (C) Bottom: Sun / Brightness (🔆 + dual arrows)
-    const iconSunX = ax;
-    const iconSunY = ay + s * 0.58;
-    // Draw sun icon
-    overlayCtx.save();
-    overlayCtx.translate(iconSunX, iconSunY);
-    overlayCtx.beginPath();
-    overlayCtx.arc(0, 0, 3.5, 0, Math.PI * 2);
-    overlayCtx.stroke();
-    for (let i = 0; i < 8; i++) {
-      const a = (i * Math.PI) / 4;
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(Math.cos(a) * 5.5, Math.sin(a) * 5.5);
-      overlayCtx.lineTo(Math.cos(a) * 8.5, Math.sin(a) * 8.5);
-      overlayCtx.stroke();
-    }
-    overlayCtx.restore();
-    // Double arrows on both sides of sun
-    drawDoubleArrow(iconSunX - s * 0.56, iconSunY, iconSunX - 16, iconSunY);
-    drawDoubleArrow(iconSunX + 16, iconSunY, iconSunX + s * 0.56, iconSunY);
-    overlayCtx.restore();
-
-    // ── 5. Current 3D Coordinate Pick Circle Dot ──
+    // ── Current 3D Coordinate Pick Circle Dot (always confined within cube faces) ──
     const u = cubeSat.currentCoord.x; // [0, 1]
     const v = cubeSat.currentCoord.y; // [0, 1]
     const w = cubeSat.currentCoord.z; // [0, 1]
@@ -878,17 +773,38 @@ export function renderRoundedBox(
     const curRgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
-    // Pick dot position follows pointer directly or falls back to 3D projection
-    let pickX = ax;
-    let pickY = ay;
-    if (cubeSat.pointerPos) {
-      pickX = cubeSat.pointerPos.x;
-      pickY = cubeSat.pointerPos.y;
-    } else {
-      const pos3D = proj3D((u - 0.5) * 2.0, (v - 0.5) * 2.0, (w - 0.5) * 2.0);
-      pickX = pos3D.x;
-      pickY = pos3D.y;
+    // Convert (u, v, w) in [0, 1] to 3D cube model coordinate [-1, 1] on the visible faces:
+    // Top face: Y = 1, X = (u-0.5)*2, Z = (v-0.5)*2
+    // Left face: X = -1, Z = (v-0.5)*2, Y = (w-0.5)*2
+    // Right face: Z = -1, X = (u-0.5)*2, Y = (w-0.5)*2
+    let modelX = (u - 0.5) * 2;
+    let modelY = (w - 0.5) * 2;
+    let modelZ = (v - 0.5) * 2;
+
+    if (w >= 0.98) {
+      // Top face
+      modelY = 1.0;
+      modelX = (u - 0.5) * 2;
+      modelZ = (v - 0.5) * 2;
+    } else if (u <= 0.02) {
+      // Left face
+      modelX = -1.0;
+      modelZ = (v - 0.5) * 2;
+      modelY = (w - 0.5) * 2;
+    } else if (modelZ <= -0.95 || (u > 0.02 && w < 0.98)) {
+      // Right face
+      modelZ = 1.0; // front-right face
+      modelX = (u - 0.5) * 2;
+      modelY = (w - 0.5) * 2;
     }
+
+    const pos3D = proj3D(
+      Math.max(-1, Math.min(1, modelX)),
+      Math.max(-1, Math.min(1, modelY)),
+      Math.max(-1, Math.min(1, modelZ))
+    );
+    const pickX = pos3D.x;
+    const pickY = pos3D.y;
 
     overlayCtx.beginPath();
     overlayCtx.arc(pickX, pickY, 5.5, 0, Math.PI * 2);

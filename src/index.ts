@@ -558,7 +558,7 @@ export function createRoundedBoxPicker(
 
   window.addEventListener('mousemove', (e) => {
     if (isCubeSatDrag && cubeSatAnchor) {
-      document.body.style.cursor = 'crosshair';
+      document.body.style.cursor = 'default';
       const p = toCanvas(e.clientX, e.clientY);
       if (!cubeSatOpened) {
         if (cubeSatPressPt && Math.hypot(p.x - cubeSatPressPt.x, p.y - cubeSatPressPt.y) > RING_ARM_MOVE) {
@@ -593,32 +593,29 @@ export function createRoundedBoxPicker(
       const zLeft = (sx + cy) / (sy || -0.001);
       const yLeft = (syScreen + (sy + zLeft * cy) * sp) / (cp || 0.001);
 
-      // Right face (Z = -1, X in [-1,1], Y in [-1,1]):
-      const xRight = (sx + sy) / (cy || 0.001);
-      const yRight = (syScreen + (-xRight * sy - cy) * sp) / (cp || 0.001);
+      // Right face (Z = 1, X in [-1,1], Y in [-1,1]):
+      //   sx = X*cy + 1*sy => X = (sx - sy)/cy
+      //   syScreen = Y*cp - (-X*sy + cy)*sp => Y = (syScreen + (-X*sy + cy)*sp)/cp
+      const xRight = (sx - sy) / (cy || 0.001);
+      const yRight = (syScreen + (-xRight * sy + cy) * sp) / (cp || 0.001);
 
       let u = 0.5, v = 0.5, w = 0.5;
 
-      if (xTop >= -1.1 && xTop <= 1.1 && zTop >= -1.1 && zTop <= 1.1) {
+      if (syScreen > 0.0 && xTop >= -1.05 && xTop <= 1.05 && zTop >= -1.05 && zTop <= 1.05) {
         // Top Face (cold <-> warm on X, saturation/depth on Z, full brightness)
         u = Math.max(0, Math.min(1, (xTop + 1) / 2));
         v = Math.max(0, Math.min(1, (zTop + 1) / 2));
         w = 1.0;
-      } else if (zLeft >= -1.1 && zLeft <= 1.1 && yLeft >= -1.1 && yLeft <= 1.1) {
+      } else if (sx <= 0.0) {
         // Left Face (pure black shadow face toward bottom, base color toward top)
         u = 0.0;
-        v = Math.max(0, Math.min(1, (zLeft + 1) / 2));
-        w = Math.max(0, Math.min(1, (yLeft + 1) / 2)); // yLeft = -1 gives w = 0 -> pure black
-      } else if (xRight >= -1.1 && xRight <= 1.1 && yRight >= -1.1 && yRight <= 1.1) {
-        // Right Face (bright highlight face)
-        u = Math.max(0, Math.min(1, (xRight + 1) / 2));
-        v = Math.max(0, Math.min(1, (yRight + 1) / 2));
-        w = Math.max(0, Math.min(1, (yRight + 1) / 2));
+        v = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, zLeft)) + 1) / 2));
+        w = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yLeft)) + 1) / 2));
       } else {
-        // Fallback: direct screen clamped mapping
-        u = Math.max(0, Math.min(1, 0.5 + sx * 0.55));
-        v = Math.max(0, Math.min(1, 0.5 + syScreen * 0.55));
-        w = Math.max(0, Math.min(1, 0.5 + syScreen * 0.55));
+        // Right Face (bright highlight face)
+        u = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, xRight)) + 1) / 2));
+        v = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yRight)) + 1) / 2));
+        w = Math.max(0, Math.min(1, (Math.max(-1, Math.min(1, yRight)) + 1) / 2));
       }
 
       cubeSatPointerPos = p;
