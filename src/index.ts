@@ -751,7 +751,11 @@ export function createRoundedBoxPicker(
         const pBackT = proj(0, 1, -1), pFrontB = proj(0, -1, 1);
         hull = [pBackT, pRightT, pRightB, pFrontB, pLeftB, pLeftT];
       } else {
-        hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+        if (radPitch < 0) {
+          hull = [T_front, T_right, B_right, B_back, B_left, T_left];
+        } else {
+          hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+        }
       }
       
       const pointInPoly = (pt: Vec2, poly: Vec2[]): boolean => {

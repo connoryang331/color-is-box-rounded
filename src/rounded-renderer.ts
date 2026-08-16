@@ -973,24 +973,47 @@ export function renderRoundedBox(
       overlayCtx.stroke();
     } else {
       // ── 4. CUBE & CUBOID (正方体 / 长方体) ──
-      // 1. Top Face: Temperature Gradient
-      const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
-      gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
-      gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+      const isPitchNeg = pitchVal < 0;
 
-      overlayCtx.beginPath();
-      overlayCtx.moveTo(T_back.x, T_back.y);
-      overlayCtx.lineTo(T_right.x, T_right.y);
-      overlayCtx.lineTo(T_front.x, T_front.y);
-      overlayCtx.lineTo(T_left.x, T_left.y);
-      overlayCtx.closePath();
-      overlayCtx.fillStyle = gradTop;
-      overlayCtx.fill();
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      overlayCtx.lineWidth = 1;
-      overlayCtx.stroke();
+      if (isPitchNeg) {
+        // ── Looking up from below (Pitch < 0): Render Bottom Face + Front SAT Faces ──
+        // 1. Bottom Face: (B_back -> B_left -> B_front -> B_right)
+        const gradBot = overlayCtx.createLinearGradient(B_front.x, B_front.y, B_back.x, B_back.y);
+        gradBot.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        gradBot.addColorStop(1, 'rgba(20, 20, 20, 0.85)');
 
-      // 2 & 3. Unified Seamless SAT Faces
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(B_back.x, B_back.y);
+        overlayCtx.lineTo(B_right.x, B_right.y);
+        overlayCtx.lineTo(B_front.x, B_front.y);
+        overlayCtx.lineTo(B_left.x, B_left.y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = gradBot;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        overlayCtx.lineWidth = 1;
+        overlayCtx.stroke();
+      } else {
+        // ── Looking down from above (Pitch >= 0): Render Top Face ──
+        // 1. Top Face: Temperature Gradient
+        const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
+        gradTop.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+        gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
+
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(T_back.x, T_back.y);
+        overlayCtx.lineTo(T_right.x, T_right.y);
+        overlayCtx.lineTo(T_front.x, T_front.y);
+        overlayCtx.lineTo(T_left.x, T_left.y);
+        overlayCtx.closePath();
+        overlayCtx.fillStyle = gradTop;
+        overlayCtx.fill();
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        overlayCtx.lineWidth = 1;
+        overlayCtx.stroke();
+      }
+
+      // 2 & 3. Unified Seamless SAT Faces (Continuous Black <-> Base Color <-> White, No center crease)
       const gradSat = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
       gradSat.addColorStop(0, '#000000');                                         // Leftmost: Pure Black
       gradSat.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`); // Center: Pure Vibrant Base Color
@@ -1133,7 +1156,11 @@ export function renderRoundedBox(
       const pBackT = proj3D(0, 1, -1), pFrontB = proj3D(0, -1, 1);
       hull = [pBackT, pRightT, pRightB, pFrontB, pLeftB, pLeftT];
     } else {
-      hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+      if (pitchVal < 0) {
+        hull = [T_front, T_right, B_right, B_back, B_left, T_left];
+      } else {
+        hull = [T_back, T_right, B_right, B_front, B_left, T_left];
+      }
     }
 
     // Helper: Closest point on line segment [p1, p2] to point p
