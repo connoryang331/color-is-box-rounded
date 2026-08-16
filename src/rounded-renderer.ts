@@ -22,6 +22,7 @@ export interface CubeSatState {
   colorAnchor: Vec3;        // The base color captured on press
   currentCoord: Vec3;       // Current internal coord (u, v, w) in [0, 1]
   mapping: 'temp_sat_bri' | 'hsv' | 'oklch';
+  pointerPos?: Vec2 | null; // Direct pointer canvas coordinates
 }
 
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
@@ -877,10 +878,17 @@ export function renderRoundedBox(
     const curRgb = valuesToRgb(dotValues, mode);
     const finalRgb = invert ? { r: 255 - curRgb.r, g: 255 - curRgb.g, b: 255 - curRgb.b } : curRgb;
 
-    // Screen position mapped through proj3D
-    const pos3D = proj3D((u - 0.5) * 1.6, (v - 0.5) * 1.6, (w - 0.5) * 1.6);
-    const pickX = pos3D.x;
-    const pickY = pos3D.y;
+    // Pick dot position follows pointer directly or falls back to 3D projection
+    let pickX = ax;
+    let pickY = ay;
+    if (cubeSat.pointerPos) {
+      pickX = cubeSat.pointerPos.x;
+      pickY = cubeSat.pointerPos.y;
+    } else {
+      const pos3D = proj3D((u - 0.5) * 2.0, (v - 0.5) * 2.0, (w - 0.5) * 2.0);
+      pickX = pos3D.x;
+      pickY = pos3D.y;
+    }
 
     overlayCtx.beginPath();
     overlayCtx.arc(pickX, pickY, 5.5, 0, Math.PI * 2);

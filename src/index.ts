@@ -198,6 +198,8 @@ export function createRoundedBoxPicker(
   const listeners = new Set<ColorChangeCallback>();
   const rc = initWebGL(container, size);
 
+  let cubeSatPointerPos: Vec2 | null = null;
+
   let animId: number | null = null;
   const scheduleRender = () => {
     if (animId !== null) return;
@@ -206,7 +208,7 @@ export function createRoundedBoxPicker(
       renderRoundedBox(
         rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
         ringAnchor ? { anchor: ringAnchor, reveal: ringReveal, band: ringBand, colorAnchor: ringColorAnchor, angle: ringAngle } : null,
-        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: 140, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping } : null,
+        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: 140, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos } : null,
         alpha
       );
     });
@@ -429,7 +431,7 @@ export function createRoundedBoxPicker(
     lastMouseX = clientX;
     lastMouseY = clientY;
     if (isCubeSatDrag || (cubeSatAnchor && cubeSatReveal > 0.01)) {
-      rc.canvasGL.style.cursor = 'crosshair';
+      rc.canvasGL.style.cursor = 'default';
       return;
     }
     rc.canvasGL.style.cursor = hitDot(clientX, clientY) ? 'pointer' : (raycastAt(clientX, clientY) ? 'default' : 'grab');
@@ -619,6 +621,7 @@ export function createRoundedBoxPicker(
         w = Math.max(0, Math.min(1, 0.5 + syScreen * 0.55));
       }
 
+      cubeSatPointerPos = p;
       cubeSatCoord = { x: u, y: v, z: w };
       applyCubeSatCoord(u, v, w);
     } else if (isRingDrag && ringAnchor) {
@@ -704,6 +707,7 @@ export function createRoundedBoxPicker(
         cubeSatCurrentColor = null;
         notify();
       }
+      cubeSatPointerPos = null;
       cubeSatColorAnchor = null;
       animateCubeSat(0);
     }
