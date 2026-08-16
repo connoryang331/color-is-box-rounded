@@ -369,7 +369,7 @@ export function createRoundedBoxPicker(
   const hitDot = (clientX: number, clientY: number): boolean => {
     const p = toCanvas(clientX, clientY);
     const d = dotScreenPos();
-    return Math.hypot(p.x - d.x, p.y - d.y) <= 17; // dot radius is 8 + stroke
+    return Math.hypot(p.x - d.x, p.y - d.y) <= 24; // generous hit zone for indicator dot
   };
 
   const setAlphaInternal = (v: number) => {
@@ -432,7 +432,7 @@ export function createRoundedBoxPicker(
   const updateCursor = (clientX: number, clientY: number) => {
     lastMouseX = clientX;
     lastMouseY = clientY;
-    rc.canvasGL.style.cursor = raycastAt(clientX, clientY) ? 'default' : 'grab';
+    rc.canvasGL.style.cursor = hitDot(clientX, clientY) ? 'pointer' : (raycastAt(clientX, clientY) ? 'default' : 'grab');
   };
 
   rc.canvasGL.addEventListener('mousemove', (e) => {
@@ -452,7 +452,6 @@ export function createRoundedBoxPicker(
       const sv = isShiftHeld ? triangleBarycentric(e.clientX, e.clientY) : null;
       if (sv) {
         // Left Click / Drag INSIDE the saturation triangle = adjust saturation & brightness
-        // (priority over surface picking since the triangle overlays the cube)
         isSVDrag = true;
         svAnchor = { ...dotValues };
         svMix = sv;
@@ -462,26 +461,21 @@ export function createRoundedBoxPicker(
         const chosenMode = guides.satMode || 'cube_sat';
         if (chosenMode === 'cube_sat') {
           isCubeSatDrag = true;
-          cubeSatOpened = false;
+          cubeSatOpened = true;
           cubeSatPressPt = toCanvas(e.clientX, e.clientY);
           cubeSatAnchor = dotScreenPos();
           cubeSatColorAnchor = { ...dotValues };
           cubeSatCoord = { x: 0.5, y: 0.5, z: 0.5 };
+          animateCubeSat(1);
           e.preventDefault();
-          cubeSatArmTimer = window.setTimeout(() => {
-            cubeSatArmTimer = null;
-            if (isCubeSatDrag && !cubeSatOpened) {
-              cubeSatOpened = true;
-              animateCubeSat(1);
-            }
-          }, RING_HOLD_MS);
         } else if (chosenMode === 'triangle') {
           isSVDrag = true;
           svAnchor = { ...dotValues };
           animateReveal(1);
+          e.preventDefault();
         } else {
           isRingDrag = true;
-          ringOpened = false;
+          ringOpened = true;
           ringPressPt = toCanvas(e.clientX, e.clientY);
           ringAnchor = dotScreenPos();
           ringBand = null;
@@ -489,14 +483,8 @@ export function createRoundedBoxPicker(
           ringAngle = Math.PI; // the anchor color sits at 6 o'clock
           svAnchor = null;
           svMix = null;
+          animateRing(1);
           e.preventDefault();
-          ringArmTimer = window.setTimeout(() => {
-            ringArmTimer = null;
-            if (isRingDrag && !ringOpened) {
-              ringOpened = true;
-              animateRing(1);
-            }
-          }, RING_HOLD_MS);
         }
       } else if (raycastAt(e.clientX, e.clientY)) {
         // Left Click / Drag on Box surface = Color Pick (re-anchors the triangle to the new color)

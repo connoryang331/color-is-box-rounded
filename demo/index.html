@@ -505,14 +505,14 @@
           <label class="guide-toggle-item"><input type="checkbox" id="g-cx" checked><span class="guide-dot red"></span> Center X</label>
           <label class="guide-toggle-item"><input type="checkbox" id="g-cy" checked><span class="guide-dot green"></span> Center Y</label>
           <label class="guide-toggle-item"><input type="checkbox" id="g-cz" checked><span class="guide-dot blue"></span> Center Z</label>
-          <label class="guide-toggle-item"><input type="checkbox" id="g-sv-tri"><span style="width:6px;height:6px;display:inline-block;background:transparent;border-left:3px solid transparent;border-right:3px solid transparent;border-bottom:6px solid #f59e0b;"></span> SV Tri</label>
         </div>
 
-        <!-- Dot Press Tuning Switches (Cube SAT / Dual Rings) -->
-        <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 8px 0 4px 0; padding-top: 4px; border-top: 1px dashed var(--border-dashed);">Dot Press Tuning Mode</div>
-        <div class="guide-grid">
-          <label class="guide-toggle-item"><input type="checkbox" id="sw-cube-sat" checked>3D Cube SAT</label>
-          <label class="guide-toggle-item"><input type="checkbox" id="sw-dual-rings">Dual Rings</label>
+        <!-- Dot Press Tuning Single-Select Radio Mode -->
+        <div style="font-size: 10px; font-weight: 700; color: var(--text-label); text-transform: uppercase; margin: 8px 0 4px 0; padding-top: 4px; border-top: 1px dashed var(--border-dashed);">Dot Press Tuning Mode (Single Choice)</div>
+        <div class="guide-grid" style="grid-template-columns: 1fr;">
+          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-cube-sat" value="cube_sat" checked> 3D Cube SAT</label>
+          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-dual-rings" value="rings"> Dual Rings</label>
+          <label class="guide-toggle-item"><input type="radio" name="tuning-mode" id="rad-sv-tri" value="triangle"> SV Tri</label>
         </div>
 
         <!-- 3D Cube SAT Mapping Rules (1: Temp/Sat/Bri, 2: HSV, 3: OKLCH) -->
@@ -720,7 +720,6 @@
       centerX: document.getElementById('g-cx'),
       centerY: document.getElementById('g-cy'),
       centerZ: document.getElementById('g-cz'),
-      svTriangle: document.getElementById('g-sv-tri'),
     };
 
     Object.entries(guideCheckboxes).forEach(([key, el]) => {
@@ -739,30 +738,19 @@
       picker.toggleAllGuides(false);
     });
 
-    // ── Dot Press Tuning Mode Switches (3D Cube SAT / Dual Rings) ──
-    const swCubeSat = document.getElementById('sw-cube-sat');
-    const swDualRings = document.getElementById('sw-dual-rings');
+    // ── Dot Press Tuning Mode (Single Choice Radio) ──
+    const tuningRadios = document.querySelectorAll('input[name="tuning-mode"]');
     const cubeMappingBox = document.getElementById('cube-mapping-box');
 
-    swCubeSat.addEventListener('change', () => {
-      if (swCubeSat.checked) {
-        swDualRings.checked = false;
-        picker.setSatMode('cube_sat');
-        cubeMappingBox.style.display = 'block';
-      } else {
-        if (!swDualRings.checked) picker.setSatMode('triangle');
-        cubeMappingBox.style.display = 'none';
-      }
-    });
-
-    swDualRings.addEventListener('change', () => {
-      if (swDualRings.checked) {
-        swCubeSat.checked = false;
-        picker.setSatMode('rings');
-        cubeMappingBox.style.display = 'none';
-      } else {
-        if (!swCubeSat.checked) picker.setSatMode('triangle');
-      }
+    tuningRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.checked) {
+          const val = radio.value;
+          picker.setSatMode(val);
+          picker.setGuides({ svTriangle: val === 'triangle' });
+          cubeMappingBox.style.display = val === 'cube_sat' ? 'block' : 'none';
+        }
+      });
     });
 
     // ── 3D Cube SAT Mapping Rules (1: Temp/Sat/Bri, 2: HSV, 3: OKLCH) ──
