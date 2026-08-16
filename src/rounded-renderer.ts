@@ -24,6 +24,8 @@ export interface CubeSatState {
   mapping: 'temp_sat_bri' | 'hsv' | 'oklch';
   pointerPos?: Vec2 | null; // Direct pointer canvas coordinates
   currentColor?: RGBColor | null; // Live adjusted color from the Cube SAT
+  alphaRingRadius?: number; // Multiplier relative to s (default 0.92)
+  alphaRingWidth?: number;  // Stroke thickness in px (default 16)
 }
 
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
@@ -662,13 +664,13 @@ export function renderRoundedBox(
 
     const baseSize = cubeSat.size || 140;
     const s = baseSize * (0.65 + 0.35 * progress);
-    // Spacious Alpha Orbital Ring radius maintaining >25px clean gap around all 3D cube edges:
-    const rAlpha = s * 1.08;
-    const wAlpha = 20;
+    // Configurable compact Alpha Orbital Ring radius and thickness:
+    const rAlpha = s * (cubeSat.alphaRingRadius || 0.92);
+    const wAlpha = cubeSat.alphaRingWidth || 16;
 
     let ax = cubeSat.anchor.x;
     let ay = cubeSat.anchor.y;
-    const safeMargin = rAlpha + wAlpha / 2 + 12;
+    const safeMargin = rAlpha + wAlpha / 2 + 10;
     ax = Math.max(safeMargin, Math.min(width - safeMargin, ax));
     ay = Math.max(safeMargin, Math.min(height - safeMargin, ay));
 

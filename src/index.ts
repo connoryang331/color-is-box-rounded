@@ -200,6 +200,8 @@ export function createRoundedBoxPicker(
 
   let cubeSatPointerPos: Vec2 | null = null;
   let cubeSatSize = guides.cubeSatSize || 165;
+  let alphaRingRadius = guides.alphaRingRadius !== undefined ? guides.alphaRingRadius : 0.92;
+  let alphaRingWidth = guides.alphaRingWidth !== undefined ? guides.alphaRingWidth : 16;
 
   let animId: number | null = null;
   const scheduleRender = () => {
@@ -209,7 +211,7 @@ export function createRoundedBoxPicker(
       renderRoundedBox(
         rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
         ringAnchor ? { anchor: ringAnchor, reveal: ringReveal, band: ringBand, colorAnchor: ringColorAnchor, angle: ringAngle } : null,
-        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: cubeSatSize, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos, currentColor: cubeSatCurrentColor } : null,
+        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: cubeSatSize, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping, pointerPos: cubeSatPointerPos, currentColor: cubeSatCurrentColor, alphaRingRadius, alphaRingWidth } : null,
         alpha
       );
     });
@@ -448,14 +450,14 @@ export function createRoundedBoxPicker(
     if (cubeSatAnchor && cubeSatReveal > 0.05) {
       const p = toCanvas(e.clientX, e.clientY);
       const s = cubeSatSize;
-      const rAlpha = s * 1.08;
-      const wAlpha = 20;
-      const safeMargin = rAlpha + wAlpha / 2 + 12;
+      const rAlpha = s * alphaRingRadius;
+      const wAlpha = alphaRingWidth;
+      const safeMargin = rAlpha + wAlpha / 2 + 10;
       const ax = Math.max(safeMargin, Math.min(rc.width - safeMargin, cubeSatAnchor.x));
       const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
       const distFromCenter = Math.hypot(p.x - ax, p.y - ay);
 
-      if (distFromCenter <= rAlpha + wAlpha / 2 + 14) {
+      if (distFromCenter <= rAlpha + wAlpha / 2 + 10) {
         // Clicked INSIDE the Cube SAT or its Alpha Ring: resume dragging / adjusting
         isCubeSatDrag = true;
         cubeSatOpened = true;
@@ -639,9 +641,9 @@ export function createRoundedBoxPicker(
       const radPitch = 19 * Math.PI / 180;
       const cy = Math.cos(radYaw), sy = Math.sin(radYaw);
       const cp = Math.cos(radPitch), sp = Math.sin(radPitch);
-      const rAlpha = s * 1.08;
-      const wAlpha = 20;
-      const safeMargin = rAlpha + wAlpha / 2 + 12;
+      const rAlpha = s * alphaRingRadius;
+      const wAlpha = alphaRingWidth;
+      const safeMargin = rAlpha + wAlpha / 2 + 10;
       const ax = Math.max(safeMargin, Math.min(rc.width - safeMargin, cubeSatAnchor.x));
       const ay = Math.max(safeMargin, Math.min(rc.height - safeMargin, cubeSatAnchor.y));
 
@@ -1035,11 +1037,23 @@ export function createRoundedBoxPicker(
       scheduleRender();
     },
     getDotSensitivity: () => guides.dotSensitivity || 36,
+    setAlphaRingRadius: (multiplier: number) => {
+      alphaRingRadius = Math.max(0.70, Math.min(1.40, multiplier));
+      guides.alphaRingRadius = alphaRingRadius;
+      scheduleRender();
+    },
+    getAlphaRingRadius: () => alphaRingRadius,
+    setAlphaRingWidth: (widthPx: number) => {
+      alphaRingWidth = Math.max(6, Math.min(36, widthPx));
+      guides.alphaRingWidth = alphaRingWidth;
+      scheduleRender();
+    },
+    getAlphaRingWidth: () => alphaRingWidth,
     setHoldDelay: (delayMs: number) => {
       guides.holdDelayMs = Math.max(0, Math.min(800, delayMs));
       scheduleRender();
     },
-    getHoldDelay: () => guides.holdDelayMs !== undefined ? guides.holdDelayMs : 180,
+    getHoldDelay: () => guides.holdDelayMs !== undefined ? guides.holdDelayMs : 300,
     setRotation: (yawDeg: number, pitchDeg: number) => {
       // Legacy API compatibility: reset object orientation and viewport (Y axis 0 deg)
       objMat = mat3FromEuler(pitchDeg * DEG, 0, yawDeg * DEG);

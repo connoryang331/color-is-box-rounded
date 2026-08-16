@@ -95,6 +95,10 @@ export interface GuideVisibility {
   dotSensitivity: number;
   /** Hold duration threshold in milliseconds before triggering 3D Cube SAT on surface press (default 300ms, range 0ms ~ 800ms) */
   holdDelayMs: number;
+  /** Radius multiplier for the Alpha Orbital Ring around Cube SAT relative to size (default 0.92, range 0.75 ~ 1.30) */
+  alphaRingRadius: number;
+  /** Stroke thickness of the Alpha Orbital Ring in pixels (default 16px, range 8px ~ 32px) */
+  alphaRingWidth: number;
 }
 
 export const DEFAULT_GUIDES: GuideVisibility = {
@@ -111,6 +115,8 @@ export const DEFAULT_GUIDES: GuideVisibility = {
   cubeSatSize: 165,
   dotSensitivity: 36,
   holdDelayMs: 300,
+  alphaRingRadius: 0.92,
+  alphaRingWidth: 16,
 };
 
 export const AXIS_LABELS: Record<ColorMode, [string, string, string]> = {
@@ -138,6 +144,10 @@ export interface RoundedBoxColorPicker {
   getCubeSatMapping(): CubeSatMapping;
   setCubeSatSize(size: number): void;
   getCubeSatSize(): number;
+  setAlphaRingRadius(multiplier: number): void;
+  getAlphaRingRadius(): number;
+  setAlphaRingWidth(widthPx: number): void;
+  getAlphaRingWidth(): number;
   setDotSensitivity(radiusPx: number): void;
   getDotSensitivity(): number;
   setHoldDelay(delayMs: number): void;
