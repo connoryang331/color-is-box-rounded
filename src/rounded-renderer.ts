@@ -746,7 +746,7 @@ export function renderRoundedBox(
     overlayCtx.lineWidth = 1;
     overlayCtx.stroke();
 
-    // ── Cube Wireframe Accents ──
+    // ── Cube Wireframe Accents (outer perimeter + top edges only, no center dividing line) ──
     overlayCtx.beginPath();
     overlayCtx.moveTo(T_back.x, T_back.y);
     overlayCtx.lineTo(T_right.x, T_right.y);
@@ -755,8 +755,7 @@ export function renderRoundedBox(
     overlayCtx.lineTo(B_left.x, B_left.y);
     overlayCtx.lineTo(T_left.x, T_left.y);
     overlayCtx.closePath();
-    overlayCtx.moveTo(T_front.x, T_front.y);
-    overlayCtx.lineTo(B_front.x, B_front.y);
+    // Top edges of left/right faces meet at T_front — no vertical center line
     overlayCtx.moveTo(T_front.x, T_front.y);
     overlayCtx.lineTo(T_left.x, T_left.y);
     overlayCtx.moveTo(T_front.x, T_front.y);
