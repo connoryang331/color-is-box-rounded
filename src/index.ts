@@ -428,6 +428,10 @@ export function createRoundedBoxPicker(
   const updateCursor = (clientX: number, clientY: number) => {
     lastMouseX = clientX;
     lastMouseY = clientY;
+    if (isCubeSatDrag || (cubeSatAnchor && cubeSatReveal > 0.01)) {
+      rc.canvasGL.style.cursor = 'crosshair';
+      return;
+    }
     rc.canvasGL.style.cursor = hitDot(clientX, clientY) ? 'pointer' : (raycastAt(clientX, clientY) ? 'default' : 'grab');
   };
 
@@ -436,6 +440,7 @@ export function createRoundedBoxPicker(
   });
 
   rc.canvasGL.addEventListener('mousedown', (e) => {
+    if (isCubeSatDrag) return;
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       // Middle Click (or Alt+Left Click) = Blender Viewport 3D Tumble
       isTumbling = true;
@@ -515,16 +520,14 @@ export function createRoundedBoxPicker(
 
     let newRgb: RGBColor;
     if (rule === 'temp_sat_bri') {
-      // u: Temperature (cold <-> warm: blue <-> red shift)
-      // v: Saturation (up/down: desaturated gray <-> vibrant color)
-      // w: Brightness (left/right or front/back: dark <-> light)
+      // u in [0, 1]: Temperature (cold <-> warm: blue <-> red shift)
+      // v in [0, 1]: Saturation (up = vibrant color, down = desaturated/dark)
+      // w in [0, 1]: Brightness (0 = pure black shadow, 1 = maximum brightness / white)
       const hsb = rgbToHsb(baseRgb);
-      // Hue shifted by temperature delta [-30, +30 deg]
       const hueShift = (u - 0.5) * 60;
       const targetH = (hsb.h + hueShift + 360) % 360;
-      // Saturation scaled by v [0, 100]
       const targetS = Math.max(0, Math.min(100, v * 100));
-      // Brightness scaled by w [0, 100]
+      // Brightness directly scales with w * (0.3 + 0.7 * v) so w -> 0 reaches pure black 0
       const targetB = Math.max(0, Math.min(100, w * 100));
       newRgb = hsbToRgb({ h: targetH, s: targetS, b: targetB });
     } else if (rule === 'hsv') {
@@ -532,7 +535,7 @@ export function createRoundedBoxPicker(
       newRgb = hsbToRgb({ h: u * 359, s: v * 100, b: w * 100 });
     } else {
       // Direct 3D OKLCH space: u=C [0..0.4], v=L [0..1], w=H [0..359]
-      newRgb = oklchToRgb({ l: v, c: u * 0.35, h: w * 359 });
+      newRgb = oklchToRgb({ l: w, c: u * 0.35, h: v * 359 });
     }
 
     cubeSatCurrentColor = newRgb;
@@ -553,6 +556,7 @@ export function createRoundedBoxPicker(
 
   window.addEventListener('mousemove', (e) => {
     if (isCubeSatDrag && cubeSatAnchor) {
+      document.body.style.cursor = 'crosshair';
       const p = toCanvas(e.clientX, e.clientY);
       if (!cubeSatOpened) {
         if (cubeSatPressPt && Math.hypot(p.x - cubeSatPressPt.x, p.y - cubeSatPressPt.y) > RING_ARM_MOVE) {
@@ -578,49 +582,41 @@ export function createRoundedBoxPicker(
 
       // Test point against 3 visible facets:
       // Top face (Y = +1, X in [-1,1], Z in [-1,1]):
-      //   xScreen = X*cy + Z*sy
-      //   yScreen = 1*cp - (-X*sy + Z*cy)*sp
-      //   => dy = (1*cp - yScreen)/sp = -X*sy + Z*cy
-      // Inverting 2x2 system for Top face:
       const denomTop = cy * cy + sy * sy; // = 1
       const zPrimeTop = (cp - syScreen) / (sp || 0.001);
       const xTop = (sx * cy - zPrimeTop * sy) / denomTop;
       const zTop = (sx * sy + zPrimeTop * cy) / denomTop;
 
       // Left face (X = -1, Y in [-1,1], Z in [-1,1]):
-      //   sx = -cy + Z*sy => Z = (sx + cy)/sy
-      //   syScreen = Y*cp - (sy + Z*cy)*sp => Y = (syScreen + (sy + Z*cy)*sp)/cp
       const zLeft = (sx + cy) / (sy || -0.001);
       const yLeft = (syScreen + (sy + zLeft * cy) * sp) / (cp || 0.001);
 
       // Right face (Z = -1, X in [-1,1], Y in [-1,1]):
-      //   sx = X*cy - sy => X = (sx + sy)/cy
-      //   syScreen = Y*cp - (-X*sy - cy)*sp => Y = (syScreen + (-X*sy - cy)*sp)/cp
       const xRight = (sx + sy) / (cy || 0.001);
       const yRight = (syScreen + (-xRight * sy - cy) * sp) / (cp || 0.001);
 
       let u = 0.5, v = 0.5, w = 0.5;
 
-      if (xTop >= -1.05 && xTop <= 1.05 && zTop >= -1.05 && zTop <= 1.05) {
-        // Point is on Top Face (cold <-> warm on X, saturation/depth on Z)
+      if (xTop >= -1.1 && xTop <= 1.1 && zTop >= -1.1 && zTop <= 1.1) {
+        // Top Face (cold <-> warm on X, saturation/depth on Z, full brightness)
         u = Math.max(0, Math.min(1, (xTop + 1) / 2));
-        v = 1.0;
-        w = Math.max(0, Math.min(1, (zTop + 1) / 2));
-      } else if (zLeft >= -1.05 && zLeft <= 1.05 && yLeft >= -1.05 && yLeft <= 1.05) {
-        // Point is on Left Face (dark shadow face)
+        v = Math.max(0, Math.min(1, (zTop + 1) / 2));
+        w = 1.0;
+      } else if (zLeft >= -1.1 && zLeft <= 1.1 && yLeft >= -1.1 && yLeft <= 1.1) {
+        // Left Face (pure black shadow face toward bottom, base color toward top)
         u = 0.0;
-        v = Math.max(0, Math.min(1, (yLeft + 1) / 2));
-        w = Math.max(0, Math.min(1, (zLeft + 1) / 2));
-      } else if (xRight >= -1.05 && xRight <= 1.05 && yRight >= -1.05 && yRight <= 1.05) {
-        // Point is on Right Face (bright highlight face)
+        v = Math.max(0, Math.min(1, (zLeft + 1) / 2));
+        w = Math.max(0, Math.min(1, (yLeft + 1) / 2)); // yLeft = -1 gives w = 0 -> pure black
+      } else if (xRight >= -1.1 && xRight <= 1.1 && yRight >= -1.1 && yRight <= 1.1) {
+        // Right Face (bright highlight face)
         u = Math.max(0, Math.min(1, (xRight + 1) / 2));
         v = Math.max(0, Math.min(1, (yRight + 1) / 2));
-        w = 0.0;
+        w = Math.max(0, Math.min(1, (yRight + 1) / 2));
       } else {
         // Fallback: direct screen clamped mapping
         u = Math.max(0, Math.min(1, 0.5 + sx * 0.55));
         v = Math.max(0, Math.min(1, 0.5 + syScreen * 0.55));
-        w = Math.max(0, Math.min(1, 0.5 + (sx + syScreen) * 0.35));
+        w = Math.max(0, Math.min(1, 0.5 + syScreen * 0.55));
       }
 
       cubeSatCoord = { x: u, y: v, z: w };
