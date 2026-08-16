@@ -625,39 +625,37 @@ export function createRoundedBoxPicker(
 
       let u = 0.5, v = 0.5, w = 0.5;
 
-      if (topT1.inside || topT2.inside || p.y < T_front.y) {
-        // --- TOP FACE ---
-        // Projected span on Top Face:
-        // Left-right axis along (T_left -> T_right)
-        // Depth axis along (T_back -> T_front)
-        const dxTop = (p.x - ax) / (s * 0.44);
-        const dyTop = (ay - p.y) / (s * 0.44);
-        // Map to u (temperature / cold-warm) and v (saturation)
-        u = Math.max(0, Math.min(1, 0.5 + dxTop * 0.7));
-        v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
-        w = 1.0;
-      } else if (p.x <= T_front.x) {
-        // --- LEFT FACE: HORIZONTAL — front edge=base color, left edge=black ---
-        // Project p onto T_front→T_left axis (same as canvas gradient direction)
-        const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
-        const gLen2 = gx * gx + gy * gy || 1;
-        const darkness = Math.max(0, Math.min(1,
-          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
-        // darkness: 0 at front edge (base color), 1 at left edge (black)
-        u = 0.5;       // no hue shift
-        v = 1.0;       // full saturation
-        w = 1 - darkness; // brightness: 100% → 0%
-      } else {
+      const isRight = rightT1.inside || rightT2.inside;
+      const isLeft  = leftT1.inside  || leftT2.inside;
+      const isTop   = topT1.inside   || topT2.inside;
+
+      if (isRight || (p.x > T_front.x && !isTop && p.y >= T_right.y)) {
         // --- RIGHT FACE: HORIZONTAL — front edge=base color, right edge=white ---
-        // Project p onto T_front→T_right axis (same as canvas gradient direction)
         const gx = T_right.x - T_front.x, gy = T_right.y - T_front.y;
         const gLen2 = gx * gx + gy * gy || 1;
         const whiteness = Math.max(0, Math.min(1,
           ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
         // whiteness: 0 at front edge (base color), 1 at right edge (white)
         u = 0.5;            // no hue shift
-        v = 1 - whiteness;  // sat: 100% → 0%
-        w = 1.0;            // bri: always 100%
+        v = 1 - whiteness;  // sat: 100% → 0% (pure white)
+        w = 1.0;            // bri: 100%
+      } else if (isLeft || (p.x <= T_front.x && !isTop && p.y >= T_left.y)) {
+        // --- LEFT FACE: HORIZONTAL — front edge=base color, left edge=black ---
+        const gx = T_left.x - T_front.x, gy = T_left.y - T_front.y;
+        const gLen2 = gx * gx + gy * gy || 1;
+        const darkness = Math.max(0, Math.min(1,
+          ((p.x - T_front.x) * gx + (p.y - T_front.y) * gy) / gLen2));
+        // darkness: 0 at front edge (base color), 1 at left edge (black)
+        u = 0.5;            // no hue shift
+        v = 1.0;            // full sat
+        w = 1 - darkness;   // bri: 100% → 0% (pure black)
+      } else {
+        // --- TOP FACE ---
+        const dxTop = (p.x - ax) / (s * 0.44);
+        const dyTop = (ay - p.y) / (s * 0.44);
+        u = Math.max(0, Math.min(1, 0.5 + dxTop * 0.7));
+        v = Math.max(0, Math.min(1, 0.5 + dyTop * 0.7));
+        w = 1.0;
       }
 
       cubeSatPointerPos = p;
