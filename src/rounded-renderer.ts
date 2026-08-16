@@ -699,13 +699,13 @@ export function renderRoundedBox(
     const B_right = proj3D( 1, -1, -1);
     const B_front = proj3D( 1, -1,  1);
 
-    // ── 1. Top Face: Temperature Gradient from Back (top/distant) to Front (front corner) ──
+    // ── 1. Top Face: Temperature Gradient from Front (front corner) to Back (top/distant) ──
     const baseCol = valuesToRgb(cubeSat.colorAnchor, mode);
     const baseHsb = rgbToHsb(baseCol);
     const coolCol = hsbToRgb({ h: (baseHsb.h - 30 + 360) % 360, s: baseHsb.s, b: baseHsb.b });
     const warmCol = hsbToRgb({ h: (baseHsb.h + 30) % 360, s: baseHsb.s, b: baseHsb.b });
 
-    const gradTop = overlayCtx.createLinearGradient(T_back.x, T_back.y, T_front.x, T_front.y);
+    const gradTop = overlayCtx.createLinearGradient(T_front.x, T_front.y, T_back.x, T_back.y);
     gradTop.addColorStop(0, `rgb(${coolCol.r}, ${coolCol.g}, ${coolCol.b})`);
     gradTop.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
     gradTop.addColorStop(1, `rgb(${warmCol.r}, ${warmCol.g}, ${warmCol.b})`);
