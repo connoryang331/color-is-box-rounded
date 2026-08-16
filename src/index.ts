@@ -1,10 +1,11 @@
 import type {
   RGBColor, ColorMode, Vec2, Vec3,
   ColorOutput, ColorChangeCallback, GuideVisibility, EdgeStyleConfig, RoundedBoxColorPicker,
+  SatMode, CubeSatMapping,
 } from './types';
 import { DEFAULT_GUIDES, DEFAULT_EDGE_CONFIG } from './types';
 import { CameraConfig, BoxConfig, DEFAULT_CAMERA_CONFIG, DEFAULT_BOX_CONFIG, mat3Mul, mat3RotX, mat3RotY, mat3RotZ, mat3Apply, mat3FromEuler, mat3Identity, mat3Transpose, Mat3, project3D, projectSaturationTriangle } from './camera-math';
-import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, ringColorAt } from './color-math';
+import { rgbToHex, rgbToHsb, rgbToOklch, rgbToValues, valuesToRgb, ringColorAt, hsbToRgb, oklchToRgb } from './color-math';
 import { initWebGL, renderRoundedBox, RING_CENTER_R, RING_INNER_GAP, RING_MID_GAP, RING_W } from './rounded-renderer';
 
 export interface RoundedBoxOptions {
@@ -164,16 +165,54 @@ export function createRoundedBoxPicker(
     ringAnimFrame = requestAnimationFrame(step);
   };
 
+  // ── 3D Cube SAT Popup (press & hold pick dot when satMode === 'cube_sat') ──
+  let isCubeSatDrag = false;
+  let cubeSatOpened = false;
+  let cubeSatArmTimer: number | null = null;
+  let cubeSatPressPt: Vec2 | null = null;
+  let cubeSatAnchor: Vec2 | null = null;
+  let cubeSatColorAnchor: Vec3 | null = null;
+  let cubeSatCoord: Vec3 = { x: 0.5, y: 0.5, z: 0.5 };
+  let cubeSatReveal = 0;
+  let cubeSatRevealTarget = 0;
+  let cubeSatAnimFrame: number | null = null;
+
+  const animateCubeSat = (target: number) => {
+    cubeSatRevealTarget = target;
+    if (cubeSatAnimFrame !== null) return;
+    let last = performance.now();
+    const speed = 6.0;
+    const step = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (cubeSatRevealTarget > cubeSatReveal) cubeSatReveal = Math.min(cubeSatRevealTarget, cubeSatReveal + dt * speed);
+      else cubeSatReveal = Math.max(cubeSatRevealTarget, cubeSatReveal - dt * speed);
+      scheduleRender();
+      if (Math.abs(cubeSatReveal - cubeSatRevealTarget) < 0.001) {
+        cubeSatReveal = cubeSatRevealTarget;
+        cubeSatAnimFrame = null;
+        if (cubeSatRevealTarget === 0) cubeSatAnchor = null;
+      } else {
+        cubeSatAnimFrame = requestAnimationFrame(step);
+      }
+    };
+    cubeSatAnimFrame = requestAnimationFrame(step);
+  };
+
   const listeners = new Set<ColorChangeCallback>();
   const rc = initWebGL(container, size);
 
   let animId: number | null = null;
   const scheduleRender = () => {
-    if (animId !== null) return;      animId = requestAnimationFrame(() => {
+    if (animId !== null) return;
+    animId = requestAnimationFrame(() => {
       animId = null;
-      renderRoundedBox(rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
+      renderRoundedBox(
+        rc, cam, box, mode, invert, guides, edgeStyle, dotValues, true, svAnchor, svMix, isShiftHeld, svReveal,
         ringAnchor ? { anchor: ringAnchor, reveal: ringReveal, band: ringBand, colorAnchor: ringColorAnchor, angle: ringAngle } : null,
-        alpha);
+        cubeSatAnchor ? { anchor: cubeSatAnchor, reveal: cubeSatReveal, size: 140, colorAnchor: cubeSatColorAnchor || dotValues, currentCoord: cubeSatCoord, mapping: guides.cubeSatMapping } : null,
+        alpha
+      );
     });
   };
 
@@ -419,28 +458,46 @@ export function createRoundedBoxPicker(
         svMix = sv;
         applyTriangleMix(sv);
       } else if (!isShiftHeld && hitDot(e.clientX, e.clientY)) {
-        // Press & hold the pick dot = reveal the alpha / saturation rings (no modifier).
-        // The dot is the current color's handle, so pressing it means "tune this color".
-        // Arm a hold timer instead of opening immediately: rings appear after holding
-        // still for RING_HOLD_MS (or once the pointer drags RING_ARM_MOVE px), so a quick
-        // click on the dot / cube origin behaves like any other click.
-        isRingDrag = true;
-        ringOpened = false;
-        ringPressPt = toCanvas(e.clientX, e.clientY);
-        ringAnchor = dotScreenPos();
-        ringBand = null;
-        ringColorAnchor = { ...dotValues };
-        ringAngle = Math.PI; // the anchor color sits at 6 o'clock (middle of the black→C→white ramp)
-        svAnchor = null;
-        svMix = null;
-        e.preventDefault();
-        ringArmTimer = window.setTimeout(() => {
-          ringArmTimer = null;
-          if (isRingDrag && !ringOpened) {
-            ringOpened = true;
-            animateRing(1);
-          }
-        }, RING_HOLD_MS);
+        // Press & hold the pick dot = reveal the tuning mode chosen by guides.satMode ('cube_sat' | 'rings' | 'triangle')
+        const chosenMode = guides.satMode || 'cube_sat';
+        if (chosenMode === 'cube_sat') {
+          isCubeSatDrag = true;
+          cubeSatOpened = false;
+          cubeSatPressPt = toCanvas(e.clientX, e.clientY);
+          cubeSatAnchor = dotScreenPos();
+          cubeSatColorAnchor = { ...dotValues };
+          cubeSatCoord = { x: 0.5, y: 0.5, z: 0.5 };
+          e.preventDefault();
+          cubeSatArmTimer = window.setTimeout(() => {
+            cubeSatArmTimer = null;
+            if (isCubeSatDrag && !cubeSatOpened) {
+              cubeSatOpened = true;
+              animateCubeSat(1);
+            }
+          }, RING_HOLD_MS);
+        } else if (chosenMode === 'triangle') {
+          isSVDrag = true;
+          svAnchor = { ...dotValues };
+          animateReveal(1);
+        } else {
+          isRingDrag = true;
+          ringOpened = false;
+          ringPressPt = toCanvas(e.clientX, e.clientY);
+          ringAnchor = dotScreenPos();
+          ringBand = null;
+          ringColorAnchor = { ...dotValues };
+          ringAngle = Math.PI; // the anchor color sits at 6 o'clock
+          svAnchor = null;
+          svMix = null;
+          e.preventDefault();
+          ringArmTimer = window.setTimeout(() => {
+            ringArmTimer = null;
+            if (isRingDrag && !ringOpened) {
+              ringOpened = true;
+              animateRing(1);
+            }
+          }, RING_HOLD_MS);
+        }
       } else if (raycastAt(e.clientX, e.clientY)) {
         // Left Click / Drag on Box surface = Color Pick (re-anchors the triangle to the new color)
         isPicking = true;
@@ -463,8 +520,63 @@ export function createRoundedBoxPicker(
     if (e.button === 1) e.preventDefault();
   });
 
+  // Helper to apply 3D Cube SAT coordinate (u, v, w) to color
+  const applyCubeSatCoord = (u: number, v: number, w: number) => {
+    if (!cubeSatColorAnchor) return;
+    const baseRgb = valuesToRgb(cubeSatColorAnchor, mode);
+    const rule = guides.cubeSatMapping || 'temp_sat_bri';
+
+    let newRgb: RGBColor;
+    if (rule === 'temp_sat_bri') {
+      // u: Temperature (cold <-> warm: blue <-> red shift)
+      // v: Saturation (up/down: desaturated gray <-> vibrant color)
+      // w: Brightness (left/right or front/back: dark <-> light)
+      const hsb = rgbToHsb(baseRgb);
+      // Hue shifted by temperature delta [-30, +30 deg]
+      const hueShift = (u - 0.5) * 60;
+      const targetH = (hsb.h + hueShift + 360) % 360;
+      // Saturation scaled by v [0, 100]
+      const targetS = Math.max(0, Math.min(100, v * 100));
+      // Brightness scaled by w [0, 100]
+      const targetB = Math.max(0, Math.min(100, w * 100));
+      newRgb = hsbToRgb({ h: targetH, s: targetS, b: targetB });
+    } else if (rule === 'hsv') {
+      // Direct 3D HSV space: u=H [0..359], v=S [0..100], w=V [0..100]
+      newRgb = hsbToRgb({ h: u * 359, s: v * 100, b: w * 100 });
+    } else {
+      // Direct 3D OKLCH space: u=C [0..0.4], v=L [0..1], w=H [0..359]
+      newRgb = oklchToRgb({ l: v, c: u * 0.35, h: w * 359 });
+    }
+
+    dotValues = rgbToValues(newRgb, mode);
+    notify();
+    scheduleRender();
+  };
+
   window.addEventListener('mousemove', (e) => {
-    if (isRingDrag && ringAnchor) {
+    if (isCubeSatDrag && cubeSatAnchor) {
+      const p = toCanvas(e.clientX, e.clientY);
+      if (!cubeSatOpened) {
+        if (cubeSatPressPt && Math.hypot(p.x - cubeSatPressPt.x, p.y - cubeSatPressPt.y) > RING_ARM_MOVE) {
+          if (cubeSatArmTimer !== null) {
+            window.clearTimeout(cubeSatArmTimer);
+            cubeSatArmTimer = null;
+          }
+          cubeSatOpened = true;
+          animateCubeSat(1);
+        }
+        return;
+      }
+      // Dragging inside 3D Cube SAT: calculate relative delta from anchor
+      const s = 140;
+      const dx = (p.x - cubeSatAnchor.x) / (s * 0.6);
+      const dy = (p.y - cubeSatAnchor.y) / (s * 0.6);
+      const u = Math.max(0, Math.min(1, 0.5 + dx));
+      const v = Math.max(0, Math.min(1, 0.5 - dy));
+      const w = Math.max(0, Math.min(1, 0.5 + dx * 0.5 - dy * 0.5));
+      cubeSatCoord = { x: u, y: v, z: w };
+      applyCubeSatCoord(u, v, w);
+    } else if (isRingDrag && ringAnchor) {
       const p = toCanvas(e.clientX, e.clientY);
       // Rings not open yet: dragging past RING_ARM_MOVE px opens them immediately;
       // otherwise the hold timer decides. Nothing is adjusted before the rings are open.
@@ -534,6 +646,17 @@ export function createRoundedBoxPicker(
   });
 
   window.addEventListener('mouseup', () => {
+    if (isCubeSatDrag) {
+      if (cubeSatArmTimer !== null) {
+        window.clearTimeout(cubeSatArmTimer);
+        cubeSatArmTimer = null;
+      }
+      isCubeSatDrag = false;
+      cubeSatOpened = false;
+      cubeSatPressPt = null;
+      cubeSatColorAnchor = null;
+      animateCubeSat(0);
+    }
     if (isRingDrag) {
       if (ringArmTimer !== null) {
         window.clearTimeout(ringArmTimer);
@@ -678,12 +801,20 @@ export function createRoundedBoxPicker(
     },
     setMode: (m: ColorMode) => {
       mode = m;
-      svAnchor = null;
-      svMix = null;
       notify();
       scheduleRender();
     },
     getMode: () => mode,
+    setSatMode: (sm: SatMode) => {
+      guides.satMode = sm;
+      scheduleRender();
+    },
+    getSatMode: () => guides.satMode || 'cube_sat',
+    setCubeSatMapping: (csm: CubeSatMapping) => {
+      guides.cubeSatMapping = csm;
+      scheduleRender();
+    },
+    getCubeSatMapping: () => guides.cubeSatMapping || 'temp_sat_bri',
     setRotation: (yawDeg: number, pitchDeg: number) => {
       // Legacy API compatibility: reset object orientation and viewport (Y axis 0 deg)
       objMat = mat3FromEuler(pitchDeg * DEG, 0, yawDeg * DEG);

@@ -72,6 +72,9 @@ export const DEFAULT_EDGE_CONFIG: EdgeStyleConfig = {
   backOpacity: 0.25,
 };
 
+export type SatMode = 'rings' | 'triangle' | 'cube_sat';
+export type CubeSatMapping = 'temp_sat_bri' | 'hsv' | 'oklch';
+
 export interface GuideVisibility {
   vertexX: boolean;
   vertexY: boolean;
@@ -82,6 +85,10 @@ export interface GuideVisibility {
   angleGuides: boolean;
   /** Saturation triangle overlay (current color / white / black), draggable to adjust saturation & brightness */
   svTriangle: boolean;
+  /** Tuning mode when pressing the pick indicator: 'rings' | 'triangle' | 'cube_sat' */
+  satMode: SatMode;
+  /** Coordinate mapping rule for 3D Cube SAT */
+  cubeSatMapping: CubeSatMapping;
 }
 
 export const DEFAULT_GUIDES: GuideVisibility = {
@@ -93,6 +100,8 @@ export const DEFAULT_GUIDES: GuideVisibility = {
   centerZ: true,
   angleGuides: true,
   svTriangle: true,
+  satMode: 'cube_sat',
+  cubeSatMapping: 'temp_sat_bri',
 };
 
 export const AXIS_LABELS: Record<ColorMode, [string, string, string]> = {
@@ -114,6 +123,10 @@ export interface RoundedBoxColorPicker {
   setColor(color: RGBColor): void;
   setMode(mode: ColorMode): void;
   getMode(): ColorMode;
+  setSatMode(satMode: SatMode): void;
+  getSatMode(): SatMode;
+  setCubeSatMapping(mapping: CubeSatMapping): void;
+  getCubeSatMapping(): CubeSatMapping;
   setRotation(yawDeg: number, pitchDeg: number): void;
   getAxisRotation(): { rotXDeg: number; rotYDeg: number; rotZDeg: number };
   /**

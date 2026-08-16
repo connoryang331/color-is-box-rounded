@@ -14,6 +14,16 @@ export const RING_MID_GAP = 8;
 /** Band width of BOTH rings, in canvas px. */
 export const RING_W = 16;
 
+/** Visible state of the 3D Cube SAT popup (passed to the renderer each frame). */
+export interface CubeSatState {
+  anchor: Vec2;           // Screen center of the popup
+  reveal: number;           // 0..1 animation progress
+  size: number;             // Width / height in px (e.g. 150)
+  colorAnchor: Vec3;        // The base color captured on press
+  currentCoord: Vec3;       // Current internal coord (u, v, w) in [0, 1]
+  mapping: 'temp_sat_bri' | 'hsv' | 'oklch';
+}
+
 /** Visible state of the pressed pick-dot rings (passed to the renderer each frame). */
 export interface RingState {
   /** Screen-space ring center (the dot position at press). */
@@ -280,6 +290,7 @@ export function renderRoundedBox(
   svShow: boolean,
   svReveal: number,
   ring: RingState | null,
+  cubeSat: CubeSatState | null,
   alpha: number,
 ): void {
   const { gl, overlayCtx, width, height, program, uniforms } = rc;
@@ -641,5 +652,236 @@ export function renderRoundedBox(
     overlayCtx.restore();
   }
 
+  // 2.4 3D Cube SAT Popup Rendering (Matches reference: 3D cube with isometric faces, icons & arrows)
+  if (cubeSat && cubeSat.reveal > 0.001) {
+    overlayCtx.save();
+    const progress = easeInOutQuad(cubeSat.reveal);
+    overlayCtx.globalAlpha = progress;
+
+    const baseSize = cubeSat.size || 140;
+    const s = baseSize * (0.65 + 0.35 * progress);
+    const ax = cubeSat.anchor.x;
+    const ay = cubeSat.anchor.y;
+
+    // Isometric 3D projection parameters for the SAT cube:
+    // dx = s * cos(30°), dy = s * sin(30°), dz = s
+    const cos30 = 0.866025;
+    const sin30 = 0.5;
+    const dx = s * 0.52 * cos30;
+    const dy = s * 0.52 * sin30;
+    const dz = s * 0.62;
+
+    // Cube Center Origin at (ax, ay)
+    // 8 Isometric Vertices:
+    // Top face:
+    // T_top   = (ax, ay - dz)
+    // T_right = (ax + dx, ay - dz + dy)
+    // T_bot   = (ax, ay - dz + 2*dy)
+    // T_left  = (ax - dx, ay - dz + dy)
+    // Bottom face (shifted down by dz):
+    // B_bot   = (ax, ay + 2*dy)
+    // B_left  = (ax - dx, ay + dy)
+    // B_right = (ax + dx, ay + dy)
+
+    const T_top = { x: ax, y: ay - dz * 0.5 - dy };
+    const T_right = { x: ax + dx, y: ay - dz * 0.5 };
+    const T_bot = { x: ax, y: ay - dz * 0.5 + dy };
+    const T_left = { x: ax - dx, y: ay - dz * 0.5 };
+
+    const B_bot = { x: ax, y: ay + dz * 0.5 + dy };
+    const B_left = { x: ax - dx, y: ay + dz * 0.5 };
+    const B_right = { x: ax + dx, y: ay + dz * 0.5 };
+
+    // Draw backdrop card (subtle dark glassmorphism card for contrast)
+    overlayCtx.save();
+    overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    overlayCtx.shadowBlur = 24;
+    overlayCtx.shadowOffsetY = 8;
+    overlayCtx.fillStyle = 'rgba(28, 28, 28, 0.88)';
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    overlayCtx.lineWidth = 1;
+    const cardW = s * 1.55;
+    const cardH = s * 1.75;
+    const cardX = ax - cardW * 0.5;
+    const cardY = ay - cardH * 0.5;
+    overlayCtx.beginPath();
+    overlayCtx.roundRect ? overlayCtx.roundRect(cardX, cardY, cardW, cardH, 16) : overlayCtx.rect(cardX, cardY, cardW, cardH);
+    overlayCtx.fill();
+    overlayCtx.stroke();
+    overlayCtx.restore();
+
+    // ── 1. Top Face (Hue / Temperature / Saturation blend) ──
+    const gradTop = overlayCtx.createLinearGradient(T_left.x, T_left.y, T_right.x, T_right.y);
+    const baseCol = valuesToRgb(cubeSat.colorAnchor, mode);
+    gradTop.addColorStop(0, '#00a8ff');
+    gradTop.addColorStop(0.5, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+    gradTop.addColorStop(1, '#ff6b6b');
+
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(T_top.x, T_top.y);
+    overlayCtx.lineTo(T_right.x, T_right.y);
+    overlayCtx.lineTo(T_bot.x, T_bot.y);
+    overlayCtx.lineTo(T_left.x, T_left.y);
+    overlayCtx.closePath();
+    overlayCtx.fillStyle = gradTop;
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    overlayCtx.lineWidth = 1;
+    overlayCtx.stroke();
+
+    // ── 2. Left Face (Saturation -> Dark/Black Shading) ──
+    const gradLeft = overlayCtx.createLinearGradient(T_left.x, T_left.y, B_left.x, B_left.y);
+    gradLeft.addColorStop(0, `rgb(${baseCol.r}, ${baseCol.g}, ${baseCol.b})`);
+    gradLeft.addColorStop(1, '#050505');
+
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(T_left.x, T_left.y);
+    overlayCtx.lineTo(T_bot.x, T_bot.y);
+    overlayCtx.lineTo(B_bot.x, B_bot.y);
+    overlayCtx.lineTo(B_left.x, B_left.y);
+    overlayCtx.closePath();
+    overlayCtx.fillStyle = gradLeft;
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    overlayCtx.lineWidth = 1;
+    overlayCtx.stroke();
+
+    // ── 3. Right Face (Saturation -> Bright/Light/White Shading) ──
+    const gradRight = overlayCtx.createLinearGradient(T_bot.x, T_bot.y, T_right.x, T_right.y);
+    gradRight.addColorStop(0, `rgb(${Math.min(255, baseCol.r + 20)}, ${Math.min(255, baseCol.g + 20)}, ${Math.min(255, baseCol.b + 20)})`);
+    gradRight.addColorStop(1, '#ffffff');
+
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(T_bot.x, T_bot.y);
+    overlayCtx.lineTo(T_right.x, T_right.y);
+    overlayCtx.lineTo(B_right.x, B_right.y);
+    overlayCtx.lineTo(B_bot.x, B_bot.y);
+    overlayCtx.closePath();
+    overlayCtx.fillStyle = gradRight;
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    overlayCtx.lineWidth = 1;
+    overlayCtx.stroke();
+
+    // ── 4. Icons & White Arrows matching the reference ──
+    overlayCtx.save();
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    overlayCtx.lineWidth = 1.6;
+    overlayCtx.lineCap = 'round';
+    overlayCtx.lineJoin = 'round';
+
+    // Helper: double-ended arrow
+    const drawDoubleArrow = (x1: number, y1: number, x2: number, y2: number, arrowLen = 6) => {
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(x1, y1);
+      overlayCtx.lineTo(x2, y2);
+      overlayCtx.stroke();
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      // Arrow at start
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(x1 + arrowLen * Math.cos(angle + Math.PI / 4), y1 + arrowLen * Math.sin(angle + Math.PI / 4));
+      overlayCtx.lineTo(x1, y1);
+      overlayCtx.lineTo(x1 + arrowLen * Math.cos(angle - Math.PI / 4), y1 + arrowLen * Math.sin(angle - Math.PI / 4));
+      overlayCtx.stroke();
+      // Arrow at end
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(x2 - arrowLen * Math.cos(angle + Math.PI / 4), y2 - arrowLen * Math.sin(angle + Math.PI / 4));
+      overlayCtx.lineTo(x2, y2);
+      overlayCtx.lineTo(x2 - arrowLen * Math.cos(angle - Math.PI / 4), y2 - arrowLen * Math.sin(angle - Math.PI / 4));
+      overlayCtx.stroke();
+    };
+
+    // (A) Top Left: Temperature / Hue (🌡️ + diagonal arrow)
+    const iconTempX = ax - s * 0.42;
+    const iconTempY = ay - s * 0.68;
+    // Draw thermometer SVG path
+    overlayCtx.save();
+    overlayCtx.translate(iconTempX, iconTempY);
+    overlayCtx.scale(0.85, 0.85);
+    overlayCtx.beginPath();
+    overlayCtx.arc(0, 4, 3.5, 0, Math.PI * 2);
+    overlayCtx.fill();
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(-1.8, 3);
+    overlayCtx.lineTo(-1.8, -6);
+    overlayCtx.arc(0, -6, 1.8, Math.PI, 0);
+    overlayCtx.lineTo(1.8, 3);
+    overlayCtx.stroke();
+    // Ticks
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(3, -5); overlayCtx.lineTo(5, -5);
+    overlayCtx.moveTo(3, -2); overlayCtx.lineTo(5, -2);
+    overlayCtx.moveTo(3, 1); overlayCtx.lineTo(5, 1);
+    overlayCtx.stroke();
+    overlayCtx.restore();
+    // Arrow below thermometer
+    drawDoubleArrow(iconTempX - 16, iconTempY + 14, iconTempX + 16, iconTempY + 6);
+
+    // (B) Top Right: Rainbow / Saturation (🌈 + vertical arrow)
+    const iconSatX = ax + s * 0.42;
+    const iconSatY = ay - s * 0.68;
+    // Draw rainbow arcs
+    overlayCtx.save();
+    overlayCtx.translate(iconSatX - 10, iconSatY);
+    overlayCtx.lineWidth = 1.4;
+    for (let r = 5; r <= 9; r += 2) {
+      overlayCtx.beginPath();
+      overlayCtx.arc(0, 2, r, Math.PI, 0);
+      overlayCtx.stroke();
+    }
+    overlayCtx.restore();
+    // Vertical arrow next to rainbow
+    drawDoubleArrow(iconSatX + 14, iconSatY - 14, iconSatX + 14, iconSatY + 14);
+
+    // (C) Bottom: Sun / Brightness (🔆 + dual arrows)
+    const iconSunX = ax;
+    const iconSunY = ay + dz * 0.5 + dy + 18;
+    // Draw sun icon
+    overlayCtx.save();
+    overlayCtx.translate(iconSunX, iconSunY);
+    overlayCtx.beginPath();
+    overlayCtx.arc(0, 0, 3.5, 0, Math.PI * 2);
+    overlayCtx.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(Math.cos(a) * 5.5, Math.sin(a) * 5.5);
+      overlayCtx.lineTo(Math.cos(a) * 8.5, Math.sin(a) * 8.5);
+      overlayCtx.stroke();
+    }
+    overlayCtx.restore();
+    // Double arrows on both sides of sun
+    drawDoubleArrow(iconSunX - s * 0.58, iconSunY, iconSunX - 16, iconSunY);
+    drawDoubleArrow(iconSunX + 16, iconSunY, iconSunX + s * 0.58, iconSunY);
+    overlayCtx.restore();
+
+    // ── 5. Current 3D Coordinate Pick Circle Dot ──
+    const u = cubeSat.currentCoord.x; // [0, 1]
+    const v = cubeSat.currentCoord.y; // [0, 1]
+    const w = cubeSat.currentCoord.z; // [0, 1]
+
+    // Screen position mapped inside the isometric cube volume:
+    // Lerp on the front corner:
+    const pickX = ax + (u - 0.5) * dx * 1.5 + (w - 0.5) * dx * 0.5;
+    const pickY = ay + (u - 0.5) * dy * 0.8 + (1 - v - 0.5) * dz * 0.85;
+
+    overlayCtx.beginPath();
+    overlayCtx.arc(pickX, pickY, 5.5, 0, Math.PI * 2);
+    overlayCtx.fillStyle = `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`;
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = '#ffffff';
+    overlayCtx.lineWidth = 2;
+    overlayCtx.stroke();
+    overlayCtx.beginPath();
+    overlayCtx.arc(pickX, pickY, 6.5, 0, Math.PI * 2);
+    overlayCtx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+    overlayCtx.lineWidth = 1;
+    overlayCtx.stroke();
+
+    overlayCtx.restore();
+  }
+
   overlayCtx.restore();
 }
+
